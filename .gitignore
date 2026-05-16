@@ -1,0 +1,83 @@
+# ======================================================
+# AURA OS V2 — .gitignore
+# Comprehensive ignore rules for GitHub deployment
+# ======================================================
+
+# ── Dependencies ─────────────────────────────────────
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+
+# ── Build Output ─────────────────────────────────────
+dist/
+build/
+.next/
+out/
+
+# ── Environment / Secrets ────────────────────────────
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+*.env
+
+# ── Logs ─────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── OS Files ─────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── IDE / Editor ─────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# ── Testing / Coverage ──────────────────────────────
+coverage/
+.nyc_output/
+*.lcov
+
+# ── Package Manager Locks (keep one, ignore others) ──
+# Keep package-lock.json OR yarn.lock, not both
+# yarn.lock
+# pnpm-lock.yaml
+
+# ── Temporary Files ──────────────────────────────────
+tmp/
+temp/
+*.tmp
+*.bak
+*.cache
+
+# ── Upload / Media (if stored locally) ───────────────
+uploads/
+*.mp4
+*.mov
+*.avi
+
+# ── Miscellaneous ────────────────────────────────────
+.cache/
+.parcel-cache/
+.turbo/
+*.tsbuildinfo

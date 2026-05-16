@@ -1,0 +1,170 @@
+.challenges-page { padding: 2rem; max-width: 720px; margin: 0 auto; }
+.challenge-toast {
+  padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem;
+  background: rgba(99, 102, 241, 0.15); color: #a5b4fc; font-size: 0.875rem;
+  border: 1px solid rgba(99, 102, 241, 0.3); animation: fadeIn 0.3s ease;
+}
+.challenge-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+
+/* List */
+.challenge-list { display: flex; flex-direction: column; gap: 1rem; }
+.challenge-card {
+  padding: 1.25rem; border-radius: 14px;
+  background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(148, 163, 184, 0.08);
+  transition: border-color 0.2s ease;
+}
+.challenge-card:hover { border-color: rgba(99, 102, 241, 0.2); }
+.challenge-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.challenge-title { font-weight: 700; font-size: 1.05rem; color: #f1f5f9; }
+.challenge-badges { display: flex; gap: 0.5rem; align-items: center; }
+.routing-badge { font-size: 0.7rem; font-weight: 700; }
+.challenge-status { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.challenge-id { font-size: 0.68rem; color: #6366f1; font-family: 'Fira Code', monospace; margin-bottom: 0.5rem; }
+.challenge-meta {
+  display: flex; gap: 1rem; font-size: 0.8rem; color: #64748b; margin-bottom: 1rem;
+}
+.friend-target-banner {
+  padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 0.5rem;
+  background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2);
+  font-size: 0.9rem;
+}
+.routing-info {
+  padding: 0.5rem 0.75rem; border-radius: 6px;
+  background: rgba(99, 102, 241, 0.05); border: 1px dashed rgba(99, 102, 241, 0.15);
+}
+.routing-hint { font-size: 0.75rem; color: #94a3b8; }
+.challenge-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.winner-banner {
+  margin-top: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 8px;
+  background: rgba(34, 197, 94, 0.1); color: #4ade80; font-size: 0.85rem; font-weight: 600;
+}
+
+/* Buttons */
+.btn-activate { background: rgba(16, 185, 129, 0.15); color: #34d399; border: none; border-radius: 8px; padding: 0.4rem 0.75rem; font-size: 0.8rem; cursor: pointer; }
+.btn-activate:hover { background: rgba(16, 185, 129, 0.25); }
+.btn-submit { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: none; border-radius: 8px; padding: 0.4rem 0.75rem; font-size: 0.8rem; cursor: pointer; }
+.btn-submit:hover { background: rgba(59, 130, 246, 0.25); }
+.btn-resolve { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: none; border-radius: 8px; padding: 0.4rem 0.75rem; font-size: 0.8rem; cursor: pointer; }
+.btn-resolve:hover { background: rgba(139, 92, 246, 0.25); }
+.btn-cancel-challenge { background: rgba(239, 68, 68, 0.1); color: #f87171; border: none; border-radius: 8px; padding: 0.4rem 0.75rem; font-size: 0.8rem; cursor: pointer; }
+.btn-cancel-challenge:hover { background: rgba(239, 68, 68, 0.2); }
+
+/* Proof Form */
+.proof-form { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.proof-input {
+  width: 100%; padding: 0.75rem; border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.15); background: rgba(15, 23, 42, 0.5);
+  color: #f1f5f9; font-size: 0.9rem; resize: vertical; outline: none;
+  font-family: inherit;
+}
+.proof-input:focus { border-color: rgba(99, 102, 241, 0.4); }
+.btn-submit-proof {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff;
+  border: none; border-radius: 10px; padding: 0.6rem 1rem; font-size: 0.9rem; cursor: pointer;
+  font-weight: 600; transition: opacity 0.2s ease;
+}
+.btn-submit-proof:hover { opacity: 0.9; }
+.btn-submit-proof:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Create Form */
+.create-form { display: flex; flex-direction: column; gap: 1rem; }
+.form-input, .form-textarea, .form-select {
+  width: 100%; padding: 0.75rem 1rem; border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.15); background: rgba(30, 41, 59, 0.5);
+  color: #f1f5f9; font-size: 0.9rem; outline: none; font-family: inherit;
+}
+.form-input:focus, .form-textarea:focus, .form-select:focus { border-color: rgba(99, 102, 241, 0.4); }
+.form-row { display: flex; gap: 1rem; }
+.form-select { appearance: none; cursor: pointer; }
+.btn-create {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff;
+  border: none; border-radius: 12px; padding: 0.75rem 1.5rem; font-size: 1rem;
+  font-weight: 700; cursor: pointer; transition: opacity 0.2s ease;
+}
+.btn-create:hover { opacity: 0.9; }
+.btn-create:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Phase 2.4.2 additions */
+.deadline-indicator {
+  color: #f59e0b; font-weight: 600; font-size: 0.78rem;
+}
+.resolve-blocked {
+  font-size: 0.75rem; color: #94a3b8; padding: 4px 8px;
+  border-radius: 6px; background: rgba(148,163,184,0.08);
+  border: 1px dashed rgba(148,163,184,0.15);
+}
+.form-label {
+  font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px; display: block;
+}
+.form-group {
+  display: flex; flex-direction: column;
+}
+
+/* Phase 2.4.3: Proof image previews */
+.proof-images-preview {
+  display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.25rem 0;
+}
+.proof-thumb {
+  position: relative; width: 64px; height: 64px; border-radius: 8px;
+  overflow: hidden; border: 1px solid rgba(148, 163, 184, 0.15);
+}
+.proof-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.proof-thumb-remove {
+  position: absolute; top: 2px; right: 2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9); color: #fff;
+  border: none; font-size: 0.6rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+
+/* Phase 2.4.3: AI validation result display */
+.validation-result {
+  padding: 0.75rem 1rem; border-radius: 10px; margin-top: 0.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+.validation-result.verified {
+  background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.2);
+}
+.validation-result.rejected {
+  background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.2);
+}
+.validation-header {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.validation-status { font-weight: 700; font-size: 0.9rem; }
+.validation-result.verified .validation-status { color: #34d399; }
+.validation-result.rejected .validation-status { color: #f87171; }
+.validation-score {
+  font-weight: 800; font-size: 1.1rem; font-family: 'Fira Code', monospace;
+}
+.validation-result.verified .validation-score { color: #10b981; }
+.validation-result.rejected .validation-score { color: #ef4444; }
+.validation-reason {
+  margin: 0.4rem 0 0; font-size: 0.8rem; color: #94a3b8;
+  line-height: 1.4;
+}
+.validation-fallback-note {
+  margin: 0.3rem 0 0; font-size: 0.7rem; color: #f59e0b; font-style: italic;
+}
+
+/* Phase 2.4.3: Inline submissions list on challenge card */
+.submissions-inline {
+  margin: 0.75rem 0; padding: 0.75rem; border-radius: 10px;
+  background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(148, 163, 184, 0.08);
+}
+.submissions-title {
+  font-size: 0.8rem; font-weight: 700; color: #94a3b8; margin: 0 0 0.5rem;
+}
+.submissions-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.submission-row {
+  display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem 0.6rem;
+  border-radius: 6px; background: rgba(30, 41, 59, 0.4); font-size: 0.8rem;
+}
+.submission-row.leading { border-left: 3px solid #10b981; }
+.submission-rank { font-weight: 800; color: #f59e0b; min-width: 28px; }
+.submission-user { font-family: 'Fira Code', monospace; color: #94a3b8; flex: 1; }
+.submission-score { font-weight: 700; font-family: 'Fira Code', monospace; }
+.submission-score.score-pass { color: #10b981; }
+.submission-score.score-fail { color: #ef4444; }
+.submission-status-badge { font-size: 0.9rem; }

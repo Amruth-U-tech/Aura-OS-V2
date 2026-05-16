@@ -1,0 +1,41 @@
+@import './variables.css';
+@import './theme.css';
+
+/* ======================================================
+   GLOBAL STYLES
+   Reset and base layout structure
+   ====================================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-primary);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  padding: var(--spacing-lg);
+}
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.status-online { color: #4ade80; }
+.status-offline { color: #f87171; }
+.status-checking { color: #fbbf24; }

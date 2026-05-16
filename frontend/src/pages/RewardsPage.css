@@ -1,0 +1,29 @@
+.rewards-page { padding: 2rem; max-width: 720px; margin: 0 auto; }
+
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; }
+.summary-card {
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  padding: 1.5rem; border-radius: 14px; border: 1px solid;
+}
+.summary-card.earned { background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.15); }
+.summary-card.spent { background: rgba(239, 68, 68, 0.06); border-color: rgba(239, 68, 68, 0.15); }
+.summary-card.count { background: rgba(99, 102, 241, 0.06); border-color: rgba(99, 102, 241, 0.15); }
+.summary-value { font-size: 2rem; font-weight: 900; color: #f1f5f9; }
+.summary-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.tx-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.tx-row {
+  display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1rem;
+  border-radius: 10px; background: rgba(30, 41, 59, 0.4);
+  border-left: 3px solid transparent; transition: background 0.2s ease;
+}
+.tx-row:hover { background: rgba(30, 41, 59, 0.6); }
+.tx-row.positive { border-left-color: #10b981; }
+.tx-row.negative { border-left-color: #ef4444; }
+.tx-icon { font-size: 1.25rem; }
+.tx-info { flex: 1; display: flex; flex-direction: column; }
+.tx-desc { font-size: 0.875rem; color: #e2e8f0; }
+.tx-time { font-size: 0.7rem; color: #64748b; }
+.tx-amount { font-weight: 800; font-size: 1rem; }
+.tx-amount.positive { color: #34d399; }
+.tx-amount.negative { color: #f87171; }

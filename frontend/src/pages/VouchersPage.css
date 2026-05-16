@@ -1,0 +1,229 @@
+/* =====================================================
+   VOUCHERS PAGE — Phase 2.4.2
+   ===================================================== */
+
+.vouchers-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.voucher-toast {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 10px;
+  text-align: center;
+  margin-bottom: 16px;
+  animation: slideDown 0.3s ease;
+}
+
+.voucher-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.voucher-tabs .tab-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.voucher-tabs .tab-btn.active {
+  background: rgba(139,92,246,0.15);
+  color: #a78bfa;
+}
+
+/* ── Weekly XP Card ─────────────────────────────── */
+.weekly-xp-card {
+  background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.06));
+  border: 1px solid rgba(139,92,246,0.15);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.weekly-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.weekly-label {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.9rem;
+}
+
+.weekly-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #a78bfa;
+}
+
+.weekly-bar-bg {
+  height: 8px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.weekly-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #3b82f6);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.weekly-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.4);
+}
+
+/* ── Voucher Grid ───────────────────────────────── */
+.voucher-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.voucher-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: all 0.3s;
+}
+
+.voucher-card.unlocked {
+  border-color: rgba(139,92,246,0.3);
+  background: rgba(139,92,246,0.06);
+}
+
+.voucher-card.claimed {
+  border-color: rgba(16,185,129,0.3);
+  background: rgba(16,185,129,0.04);
+  opacity: 0.8;
+}
+
+.voucher-card.locked {
+  opacity: 0.5;
+}
+
+.voucher-icon {
+  font-size: 2rem;
+  min-width: 48px;
+  text-align: center;
+}
+
+.voucher-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.voucher-title {
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  font-size: 0.95rem;
+}
+
+.voucher-desc {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.82rem;
+}
+
+.voucher-threshold {
+  color: rgba(255,255,255,0.35);
+  font-size: 0.75rem;
+}
+
+.voucher-action {
+  min-width: 100px;
+  text-align: center;
+}
+
+.btn-claim {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: transform 0.2s;
+}
+
+.btn-claim:hover { transform: scale(1.05); }
+.btn-claim:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.voucher-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.voucher-status.claimed { color: #10b981; }
+.voucher-status.locked { color: rgba(255,255,255,0.3); }
+
+/* ── History ─────────────────────────────────────── */
+.voucher-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.history-icon {
+  font-size: 1.3rem;
+}
+
+.history-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-title {
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+  font-size: 0.9rem;
+}
+
+.history-date {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.4);
+}
+
+.history-status {
+  font-size: 0.8rem;
+  color: #10b981;
+  font-weight: 600;
+}

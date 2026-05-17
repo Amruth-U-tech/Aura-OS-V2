@@ -24,6 +24,7 @@ const initialState = {
   error: null,
 };
 
+// Phase 3.1.6
 const challengeReducer = (state, action) => {
   switch (action.type) {
     case 'SET_LOADING':
@@ -49,6 +50,20 @@ const challengeReducer = (state, action) => {
       const normalized = normalizeChallenge(action.payload);
       if (!normalized?._id) return state;
       return { ...state, challenges: safeUpdate(state.challenges, normalized, '_id') };
+    }
+
+    // Phase 3.1.6/3.1.7: Remove challenge from array (declined / cancelled / left for 1v1)
+    // Safe: filters by both _id and id (string) to handle any format
+    case 'REMOVE_CHALLENGE': {
+      const id = action.payload?.toString?.() || action.payload;
+      if (!id) return state;
+      return {
+        ...state,
+        challenges: state.challenges.filter(c =>
+          (c._id?.toString?.() || c._id) !== id &&
+          (c.id?.toString?.() || c.id) !== id
+        )
+      };
     }
 
     case 'SET_SELECTED':
@@ -96,10 +111,9 @@ export const ChallengeProvider = ({ children }) => {
   }, [fetchChallenges]);
 
   // ── Initial load ───────────────────────────────
-  // Phase 3.1.4: Skip if ReconnectCoordinator is handling hydration
   useEffect(() => {
     if (!authReady || !isAuthenticated) return;
-    if (reconnectCoordinator.isHydrating()) return; // Coordinator will handle this
+    if (reconnectCoordinator.isHydrating()) return;
     fetchChallenges();
   }, [authReady, isAuthenticated, fetchChallenges]);
 
@@ -115,55 +129,100 @@ export const ChallengeProvider = ({ children }) => {
     if (!authReady || !isAuthenticated) return;
 
     const handlers = {
+      // Phase 3.1.7: challenge.updated handles all structural updates
       'challenge.updated': (data) => {
         if (eventDedup.isDuplicate('challenge.updated', data)) return;
-        if (data?._id || data?.challengeId) {
+        const id = data?._id || data?.challengeId;
+        if (!id) return;
+
+        // Phase 3.1.7: PARTICIPANT_ACCEPTED for 1v1 carries newStatus=ACTIVE
+        // Force refresh so both players see the ACTIVE state immediately
+        if (data.type === 'PARTICIPANT_ACCEPTED' && data.newStatus === 'ACTIVE') {
+          fetchChallenges({ cooldownMs: 0, force: true });
+          return;
+        }
+        // WAITING_FOR_PARTICIPANTS: creator just dispatched invite — update status
+        if (data.type === 'CHALLENGE_CREATED' || data.status) {
           dispatch({
             type: 'UPDATE_CHALLENGE',
-            payload: { _id: data._id || data.challengeId, ...data }
+            payload: { _id: id, ...(data.status && { status: data.status }) }
           });
         }
+        // For validation and submission state, do full refresh
+        if (data.type === 'SUBMISSION_VALIDATED' || data.type === 'PARTICIPANT_ACCEPTED') {
+          fetchChallenges({ cooldownMs: 0, force: true });
+        }
       },
+
       'challenge.submission.created': (data) => {
         if (eventDedup.isDuplicate('challenge.submission.created', data)) return;
-        // Refresh to get accurate submission state
         fetchChallenges({ cooldownMs: 0, force: true });
       },
+
       'challenge.resolved': (data) => {
         if (eventDedup.isDuplicate('challenge.resolved', data)) return;
-        if (data?.challengeId || data?._id) {
-          dispatch({
-            type: 'UPDATE_CHALLENGE',
-            payload: {
-              _id: data._id || data.challengeId,
-              status: 'COMPLETED',
-              winnerId: data.winnerId,
-            }
-          });
+        const id = data?._id || data?.challengeId;
+        if (id) {
+          dispatch({ type: 'UPDATE_CHALLENGE', payload: { _id: id, status: 'COMPLETED', winnerId: data.winnerId } });
         }
       },
+
+      // Phase 3.1.7: challenge.declined — remove for both players if 1v1 cancelled
+      'challenge.declined': (data) => {
+        if (eventDedup.isDuplicate('challenge.declined', data)) return;
+        if (data?.isCancelled && (data?.challengeId || data?._id)) {
+          dispatch({ type: 'REMOVE_CHALLENGE', payload: data.challengeId || data._id });
+        } else if (data?.challengeId) {
+          fetchChallenges({ cooldownMs: 0, force: true });
+        }
+      },
+
+      // Phase 3.1.7: challenge.cancelled — ALWAYS remove from array
+      // This fires for BOTH players (including decliner via _loadAllParticipantIds)
+      'challenge.cancelled': (data) => {
+        if (eventDedup.isDuplicate('challenge.cancelled', data)) return;
+        const id = data?.challengeId || data?._id;
+        if (id) {
+          dispatch({ type: 'REMOVE_CHALLENGE', payload: id });
+        }
+      },
+
+      // Phase 3.1.7: challenge.ready — quorum met (hub challenges)
+      'challenge.ready': (data) => {
+        if (eventDedup.isDuplicate('challenge.ready', data)) return;
+        const id = data?.challengeId || data?._id;
+        if (id) {
+          dispatch({ type: 'UPDATE_CHALLENGE', payload: { _id: id, status: 'READY' } });
+        }
+      },
+
+      // Phase 3.1.7.1: challenge.activated — dedicated activation event
+      // Fires for BOTH players when 1v1 starts (accept) or hub starts (READY→ACTIVE)
+      // Forces full refresh to get canonical ACTIVE challenge state from backend
+      'challenge.activated': (data) => {
+        if (eventDedup.isDuplicate('challenge.activated', data)) return;
+        const id = data?.challengeId || data?._id;
+        if (id) {
+          // Optimistic update first — instant status change
+          dispatch({ type: 'UPDATE_CHALLENGE', payload: { _id: id, status: data.status || 'ACTIVE' } });
+          // Then full refresh to get enriched data (submissions, participants, canResolve)
+          fetchChallenges({ cooldownMs: 0, force: true });
+        }
+      },
+
+      'challenge.validated': (data) => {
+
+        if (eventDedup.isDuplicate('challenge.validated', data)) return;
+        fetchChallenges({ cooldownMs: 0, force: true });
+      },
+
+      // Phase 3.1.6: New challenge invite arrived — refresh to add to array
       'player.challenge.invite': (data) => {
         if (eventDedup.isDuplicate('player.challenge.invite', data)) return;
         fetchChallenges({ cooldownMs: 0, force: true });
       },
-      // Phase 3.1.5: Live validation result propagation
-      'challenge.validated': (data) => {
-        if (eventDedup.isDuplicate('challenge.validated', data)) return;
-        // Refresh to get accurate submission + validation state
-        fetchChallenges({ cooldownMs: 0, force: true });
-      },
-      // Phase 3.1.5: Live cancellation propagation
-      'challenge.cancelled': (data) => {
-        if (eventDedup.isDuplicate('challenge.cancelled', data)) return;
-        if (data?.challengeId) {
-          dispatch({
-            type: 'UPDATE_CHALLENGE',
-            payload: { _id: data.challengeId, status: 'CANCELLED' }
-          });
-        }
-      },
-      // Phase 3.1.3: socket:reconnected REMOVED — handled by ReconnectCoordinator
     };
+
 
     const unsubs = Object.entries(handlers).map(([event, handler]) =>
       eventBus.on(event, handler)
@@ -181,6 +240,7 @@ export const ChallengeProvider = ({ children }) => {
   }, []);
 
   const selectChallenge = useCallback((id) => dispatch({ type: 'SET_SELECTED', payload: id }), []);
+  const removeChallenge = useCallback((id) => dispatch({ type: 'REMOVE_CHALLENGE', payload: id?.toString?.() || id }), []);
   const selectedChallenge = state.challenges.find(c => c._id === state.selectedId) || null;
 
   return (
@@ -190,6 +250,7 @@ export const ChallengeProvider = ({ children }) => {
       loading: state.loading,
       error: state.error,
       refreshChallenges: () => fetchChallenges({ force: true, cooldownMs: 0 }),
+      removeChallenge,   // Phase 3.1.7.1: optimistic removal for decline/leave/cancel
       selectChallenge,
     }}>
       {children}

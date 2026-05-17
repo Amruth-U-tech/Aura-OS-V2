@@ -1,11 +1,13 @@
 const mongoose = require('mongoose');
-const { CHALLENGE_STATUS, CHALLENGE_TYPE } = require('../constants/domainConstants');
+const { CHALLENGE_STATUS, CHALLENGE_TYPE, PARTICIPANT_STATUS } = require('../constants/domainConstants');
 const { generateChallengeId } = require('../services/identityGenerator');
 
 // ======================================================
 // CHALLENGE — DOMAIN 10/13
-// Owns: multiplayer challenge entities and lifecycle state
-// Participants array is BOUNDED (max 10) — not a scaling concern
+// Phase 3.1.6: Full participation lifecycle
+// Participant statuses: INVITED → ACCEPTED/DECLINED/LEFT/SUBMITTED/WINNER/LOSER
+// Invitation timestamps: invitedAt, respondedAt, leftAt
+// New challenge visibility: declined participants cannot see the challenge
 // Must NOT: contain submission data, scoring, or resolution logic
 // ======================================================
 
@@ -72,19 +74,31 @@ const challengeSchema = new mongoose.Schema(
     },
 
     // ── Participants ─────────────────────────────────
-    // BOUNDED array (max 10) — safe from embedded document explosion
+    // Phase 3.1.6: Full participation lifecycle
+    // INVITED   → player was sent invite, waiting for response
+    // ACCEPTED  → player accepted the challenge invite
+    // DECLINED  → player declined (challenge hidden for them)
+    // JOINED    → player joined directly (hub open), creator always JOINED
+    // SUBMITTED → player has submitted proof
+    // LEFT      → player left voluntarily before resolution
+    // WINNER/LOSER/DISQUALIFIED/WITHDRAWN → post-resolution
     participants: [{
       userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
       },
-      joinedAt: { type: Date, default: Date.now },
       status: {
         type: String,
-        enum: ['JOINED', 'SUBMITTED', 'WINNER', 'LOSER', 'DISQUALIFIED', 'WITHDRAWN'],
-        default: 'JOINED'
-      }
+        enum: Object.values(PARTICIPANT_STATUS),
+        default: PARTICIPANT_STATUS.JOINED
+      },
+      // Lifecycle timestamps for this participant
+      invitedAt:   { type: Date, default: null },
+      joinedAt:    { type: Date, default: Date.now },
+      acceptedAt:  { type: Date, default: null },
+      declinedAt:  { type: Date, default: null },
+      leftAt:      { type: Date, default: null },
     }],
     minParticipants: { type: Number, default: 2, min: 2 },
     maxParticipants: { type: Number, default: 2, min: 2, max: 10 },
@@ -98,22 +112,18 @@ const challengeSchema = new mongoose.Schema(
     },
 
     // ── Schedule ─────────────────────────────────────
-    // startAt is OPTIONAL — if omitted, activates immediately
-    // If provided, challenge enters SCHEDULED until currentTime >= startAt
     startAt: { type: Date, default: null },
-    // endAt is MANDATORY — challenge MUST have deterministic ending point
     endAt: { type: Date, required: [true, 'Challenge must have an end time'] },
     submissionDeadline: { type: Date, default: null },
 
     // ── Lifecycle Timestamps ─────────────────────────
-    scheduledAt: { type: Date, default: null },
-    activatedAt: { type: Date, default: null },
-    lockedAt: { type: Date, default: null },
-    resolvedAt: { type: Date, default: null },
-    cancelledAt: { type: Date, default: null },
+    scheduledAt:  { type: Date, default: null },
+    activatedAt:  { type: Date, default: null },
+    lockedAt:     { type: Date, default: null },
+    resolvedAt:   { type: Date, default: null },
+    cancelledAt:  { type: Date, default: null },
 
     // ── Resolution ───────────────────────────────────
-    // Stored AFTER resolution — no winner logic here
     winnerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -135,7 +145,11 @@ challengeSchema.index({ creatorId: 1, status: 1, createdAt: -1 });
 challengeSchema.index({ hubId: 1, status: 1, createdAt: -1 });
 // Active challenges (scheduler retrieval)
 challengeSchema.index({ status: 1, endAt: 1 });
-// Participant lookup: find challenges a user is in
+// Participant lookup: find challenges a user is in (including INVITED)
 challengeSchema.index({ 'participants.userId': 1, status: 1 });
+// Phase 3.1.6: Efficient retrieval of pending invites for a user
+challengeSchema.index({ 'participants.userId': 1, 'participants.status': 1, createdAt: -1 });
+// targetFriendId for invite lookup
+challengeSchema.index({ targetFriendId: 1, status: 1 });
 
 module.exports = mongoose.model('Challenge', challengeSchema);

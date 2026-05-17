@@ -1,8 +1,10 @@
 // ======================================================
-// DOMAIN EVENT CONSTANTS — Phase 3.1
+// DOMAIN EVENT CONSTANTS — Phase 3.1.6
 // Deterministic, namespaced event identifiers
 // Every domain event in the system is defined HERE
 // Events represent COMPLETED TRUTHS — what already happened
+// Phase 3.1.6: Added CHALLENGE_INVITED, CHALLENGE_ACCEPTED,
+//              CHALLENGE_DECLINED, CHALLENGE_LEFT for participation lifecycle
 // ======================================================
 
 const EVENTS = {
@@ -23,6 +25,11 @@ const EVENTS = {
 
   // ── Challenge Domain ───────────────────────────────
   CHALLENGE_CREATED:   'challenge.created',
+  CHALLENGE_INVITED:   'challenge.invited',   // Phase 3.1.6: target receives invite
+  CHALLENGE_ACCEPTED:  'challenge.accepted',  // Phase 3.1.6: target accepted invite
+  CHALLENGE_DECLINED:  'challenge.declined',  // Phase 3.1.6: target declined invite
+  CHALLENGE_LEFT:      'challenge.left',      // Phase 3.1.6: participant left voluntarily
+  CHALLENGE_READY:     'challenge.ready',     // Phase 3.1.7: quorum met, challenge can start
   CHALLENGE_ACTIVATED: 'challenge.activated',
   CHALLENGE_JOINED:    'challenge.joined',
   CHALLENGE_SUBMITTED: 'challenge.submitted',

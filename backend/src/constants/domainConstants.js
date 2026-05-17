@@ -1,8 +1,7 @@
 // ======================================================
-// DOMAIN CONSTANTS
-// Phase 2.3 — Centralized enums for all 13 database domains
-// Each section is isolated by domain ownership
-// Must NOT: contain business logic or calculations
+// DOMAIN CONSTANTS — Phase 3.1.7
+// Challenge lifecycle corrected: Activate = Dispatch Invitation
+// Added: CHALLENGE_STATUS.READY (quorum met, waiting to start)
 // ======================================================
 
 // ── 1. Auth Domain ────────────────────────────────────
@@ -72,14 +71,28 @@ const HUB_EVENT_TYPE = {
 };
 
 // ── 10. Challenge Domain ──────────────────────────────
+// Phase 3.1.7 Lifecycle:
+//   DRAFT                → Challenge created, only visible to creator
+//   WAITING_FOR_PARTICIPANTS → Invitation dispatched, target must accept
+//   READY                → All required participants accepted, challenge can start
+//   ACTIVE               → Challenge is live, participants submit proof
+//   SUBMISSION           → All submitted, waiting for validation
+//   LOCKED               → Submissions locked, in resolution
+//   RESOLUTION           → Being resolved
+//   COMPLETED            → Fully resolved with winner determined
+//   CANCELLED            → Terminated (decline / creator cancel / too few accepted)
+//   EXPIRED              → Deadline passed before activation or resolution
+//   SCHEDULED            → Scheduled for future activation (startAt in future)
+//   PENDING              → Legacy / transitional (kept for backward compat)
 const CHALLENGE_STATUS = {
   DRAFT: 'DRAFT',
+  WAITING_FOR_PARTICIPANTS: 'WAITING_FOR_PARTICIPANTS', // invitation dispatched
+  READY: 'READY',                                      // Phase 3.1.7: quorum met
   SCHEDULED: 'SCHEDULED',
   PENDING: 'PENDING',
   ACTIVE: 'ACTIVE',
   SUBMISSION: 'SUBMISSION',
   LOCKED: 'LOCKED',
-  WAITING_FOR_PARTICIPANTS: 'WAITING_FOR_PARTICIPANTS',
   RESOLUTION: 'RESOLUTION',
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
@@ -90,6 +103,29 @@ const CHALLENGE_TYPE = {
   FRIEND_1V1: 'FRIEND_1V1',
   HUB_OPEN: 'HUB_OPEN',
   HUB_TOURNAMENT: 'HUB_TOURNAMENT'
+};
+
+// ── Phase 3.1.6: Participant Status ──────────────────
+// INVITED   → player was sent a challenge invite (has not responded)
+// ACCEPTED  → player accepted and will participate
+// DECLINED  → player declined (challenge disappears for them)
+// JOINED    → creator or player who directly joined (HUB_OPEN)
+// SUBMITTED → player has submitted proof
+// LEFT      → player left after joining (can happen before ACTIVE)
+// WINNER    → resolved as winner
+// LOSER     → resolved as loser
+// DISQUALIFIED → removed from challenge
+const PARTICIPANT_STATUS = {
+  INVITED: 'INVITED',
+  ACCEPTED: 'ACCEPTED',
+  DECLINED: 'DECLINED',
+  JOINED: 'JOINED',
+  SUBMITTED: 'SUBMITTED',
+  LEFT: 'LEFT',
+  WINNER: 'WINNER',
+  LOSER: 'LOSER',
+  DISQUALIFIED: 'DISQUALIFIED',
+  WITHDRAWN: 'WITHDRAWN'
 };
 
 // ── 11. Challenge Submission Domain ───────────────────
@@ -154,6 +190,7 @@ module.exports = {
   HUB_EVENT_TYPE,
   CHALLENGE_STATUS,
   CHALLENGE_TYPE,
+  PARTICIPANT_STATUS,
   SUBMISSION_STATUS,
   SUBMISSION_PROVIDER,
   TRANSACTION_TYPE,

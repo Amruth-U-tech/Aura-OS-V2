@@ -46,6 +46,11 @@ const BUFFERABLE_EVENTS = new Set([
   'challenge.updated',
   'challenge.submission.created',
   'challenge.resolved',
+  'challenge.validated',    // Phase 3.1.5
+  'challenge.cancelled',    // Phase 3.1.5
+  'challenge.declined',     // Phase 3.1.6
+  'challenge.ready',        // Phase 3.1.7
+  'challenge.activated',    // Phase 3.1.7.1: dedicated activation event
   'challenge.countdown',
 ]);
 
@@ -136,6 +141,9 @@ export const SocketProvider = ({ children }) => {
         makeBridge('challenge.resolved'),
         makeBridge('challenge.validated'),    // Phase 3.1.5
         makeBridge('challenge.cancelled'),    // Phase 3.1.5
+        makeBridge('challenge.declined'),     // Phase 3.1.6
+        makeBridge('challenge.ready'),        // Phase 3.1.7
+        makeBridge('challenge.activated'),    // Phase 3.1.7.1
         makeBridge('challenge.countdown'),
       ];
 

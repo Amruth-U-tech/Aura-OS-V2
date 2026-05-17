@@ -49,6 +49,45 @@
 .btn-cancel-challenge { background: rgba(239, 68, 68, 0.1); color: #f87171; border: none; border-radius: 8px; padding: 0.4rem 0.75rem; font-size: 0.8rem; cursor: pointer; }
 .btn-cancel-challenge:hover { background: rgba(239, 68, 68, 0.2); }
 
+/* Phase 3.1.6: Participation lifecycle buttons */
+.invite-actions {
+  display: flex; flex-direction: column; gap: 0.5rem; width: 100%;
+}
+.invite-banner {
+  padding: 0.6rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 600;
+  background: rgba(99, 102, 241, 0.12); color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  animation: pulse-invite 2s ease-in-out infinite;
+}
+@keyframes pulse-invite {
+  0%, 100% { border-color: rgba(99, 102, 241, 0.25); }
+  50% { border-color: rgba(99, 102, 241, 0.55); }
+}
+.btn-accept-invite {
+  background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.1));
+  color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 10px; padding: 0.55rem 1rem; font-size: 0.88rem;
+  font-weight: 700; cursor: pointer; transition: all 0.2s ease;
+}
+.btn-accept-invite:hover { background: rgba(16, 185, 129, 0.3); transform: translateY(-1px); }
+.btn-accept-invite:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-decline-invite {
+  background: rgba(239, 68, 68, 0.08); color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px; padding: 0.45rem 0.85rem; font-size: 0.8rem;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.btn-decline-invite:hover { background: rgba(239, 68, 68, 0.15); }
+.btn-decline-invite:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-leave-challenge {
+  background: rgba(248, 113, 113, 0.08); color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.15);
+  border-radius: 8px; padding: 0.4rem 0.75rem; font-size: 0.8rem; cursor: pointer;
+  transition: background 0.2s ease;
+}
+.btn-leave-challenge:hover { background: rgba(248, 113, 113, 0.15); }
+.btn-leave-challenge:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* Proof Form */
 .proof-form { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .proof-input {

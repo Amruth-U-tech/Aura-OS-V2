@@ -27,6 +27,23 @@ export const safeArray = (input) => {
 };
 
 // ── Challenge Normalization ──────────────────────────
+// Phase 3.1.6: Full participant lifecycle shape
+export const normalizeParticipant = (p) => {
+  if (!p || typeof p !== 'object') return null;
+  return {
+    userId: p.userId || null,
+    status: p.status || 'JOINED',
+    displayName: p.displayName || null,
+    auraPlayerId: p.auraPlayerId || null,
+    avatar: p.avatar || null,
+    joinedAt: p.joinedAt || null,
+    invitedAt: p.invitedAt || null,
+    acceptedAt: p.acceptedAt || null,
+    declinedAt: p.declinedAt || null,
+    leftAt: p.leftAt || null,
+  };
+};
+
 export const normalizeChallenge = (c) => {
   if (!c || typeof c !== 'object') return null;
   const _id = c._id || c.id || null;
@@ -42,20 +59,21 @@ export const normalizeChallenge = (c) => {
     targetFriendId: c.targetFriendId || null,
     hubId: c.hubId || null,
     winnerId: c.winnerId || null,
-    winnerName: c.winnerName || null,                      // Phase 3.1.5: resolved name
-    participants: safeArray(c.participants),
-    submissions: safeArray(c.submissions),                 // Phase 3.1.5: inline submissions
+    winnerName: c.winnerName || null,
+    // Phase 3.1.6: Normalize all participant lifecycle fields
+    participants: safeArray(c.participants).map(normalizeParticipant).filter(Boolean),
+    submissions: safeArray(c.submissions),
     stakeXp: typeof c.stakeXp === 'number' ? c.stakeXp : 0,
     stakeType: c.stakeType || 'XP',
     startAt: c.startAt || null,
     endAt: c.endAt || null,
-    submissionDeadline: c.submissionDeadline || null,       // Phase 3.1.5
+    submissionDeadline: c.submissionDeadline || null,
     activatedAt: c.activatedAt || null,
     resolvedAt: c.resolvedAt || null,
     createdAt: c.createdAt || null,
     updatedAt: c.updatedAt || null,
     routing: c.routing || null,
-    canResolve: !!c.canResolve,                            // Phase 3.1.5: resolve eligibility
+    canResolve: !!c.canResolve,
     resolveBlockReason: c.resolveBlockReason || null,
     submittedCount: c.submittedCount ?? null,
     totalParticipants: c.totalParticipants ?? null,
@@ -66,6 +84,38 @@ export const normalizeChallengeArray = (payload) => {
   const arr = safeArray(payload);
   return arr.map(normalizeChallenge).filter(Boolean);
 };
+
+// Phase 3.1.6: Participation state helpers (pure functions — no side effects)
+// Used in ChallengesPage to derive UI state from canonical data
+
+/** Get current user's participant entry from a challenge */
+export const getMyParticipant = (challenge, myUserId) => {
+  if (!challenge?.participants || !myUserId) return null;
+  return challenge.participants.find(p => p.userId === myUserId) || null;
+};
+
+/** Check if user is an active (non-declined, non-left) participant */
+export const isActiveParticipant = (challenge, myUserId) => {
+  const p = getMyParticipant(challenge, myUserId);
+  if (!p) return false;
+  return !['DECLINED', 'LEFT', 'DISQUALIFIED', 'WITHDRAWN'].includes(p.status);
+};
+
+/** Check if user has a pending invite to this challenge */
+export const hasInvite = (challenge, myUserId) => {
+  const p = getMyParticipant(challenge, myUserId);
+  return p?.status === 'INVITED';
+};
+
+/** Get count of active (accepted/joined) participants */
+export const getActiveParticipantCount = (challenge) => {
+  if (!challenge?.participants) return 0;
+  return challenge.participants.filter(
+    p => ['JOINED', 'ACCEPTED', 'SUBMITTED', 'WINNER', 'LOSER'].includes(p.status)
+  ).length;
+};
+
+
 
 // ── Friend Normalization ─────────────────────────────
 export const normalizeFriend = (f) => {

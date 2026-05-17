@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@context/AuthContext';
 import { useChallenges } from '@context/ChallengeContext';
 import ImageUploadZone from '@components/upload/ImageUploadZone';
+import { getMyParticipant, hasInvite } from '@utils/stateNormalizers';
 import './ChallengesPage.css';
 
 // Phase 3.1.5: Canonical identity guard — prevents /challenges/undefined/* mutations
@@ -17,9 +18,25 @@ const isValidObjectId = (id) => typeof id === 'string' && /^[a-f\d]{24}$/i.test(
 // ======================================================
 
 const STATUS_COLORS = {
-  DRAFT: '#94a3b8', SCHEDULED: '#6366f1', PENDING: '#f59e0b', ACTIVE: '#10b981',
-  SUBMISSION: '#3b82f6', WAITING_FOR_PARTICIPANTS: '#f97316', LOCKED: '#8b5cf6',
+  DRAFT: '#94a3b8',
+  WAITING_FOR_PARTICIPANTS: '#f59e0b',  // amber — waiting for response
+  READY: '#06b6d4',                     // cyan — quorum met, ready to start
+  SCHEDULED: '#6366f1', PENDING: '#f59e0b', ACTIVE: '#10b981',
+  SUBMISSION: '#3b82f6', LOCKED: '#8b5cf6',
   RESOLUTION: '#6366f1', COMPLETED: '#22c55e', CANCELLED: '#ef4444', EXPIRED: '#64748b'
+};
+
+const STATUS_LABELS = {
+  DRAFT: 'Draft',
+  WAITING_FOR_PARTICIPANTS: '⏳ Waiting',
+  READY: '✅ Ready',
+  ACTIVE: '🔥 Active',
+  SUBMISSION: '📥 Submitted',
+  LOCKED: '🔒 Locked',
+  COMPLETED: '🏆 Completed',
+  CANCELLED: '❌ Cancelled',
+  EXPIRED: '⏰ Expired',
+  SCHEDULED: '📅 Scheduled',
 };
 
 const ROUTING_LABELS = {
@@ -47,7 +64,9 @@ const ChallengesPage = () => {
   useAuth();
 
   // Phase 3.1.1: Consume from ChallengeContext (guaranteed array)
-  const { challenges, loading, refreshChallenges } = useChallenges();
+  const { challenges, loading, refreshChallenges, removeChallenge } = useChallenges();
+  const { user } = useAuth();
+  const myUserId = user?.id || user?._id || null;
 
   const [form, setForm] = useState({
     title: friendName ? `Challenge for ${friendName}` : '',
@@ -75,12 +94,25 @@ const ChallengesPage = () => {
     setActionLoading(null);
   };
 
-  const handleActivate = async (id) => {
-    if (!isValidObjectId(id)) { showMsg('Cannot activate: invalid challenge ID'); return; }
+  // Phase 3.1.7: "Activate" = dispatch invitation (DRAFT → WAITING_FOR_PARTICIPANTS)
+  const handleDispatchInvite = async (id) => {
+    if (!isValidObjectId(id)) { showMsg('Cannot send invitation: invalid challenge ID'); return; }
     setActionLoading(id);
     try {
-      await challengeApi.activateChallenge(id);
-      showMsg('Challenge activated!');
+      await challengeApi.dispatchInvite(id);
+      showMsg('📨 Invitation sent! Waiting for opponent to accept.');
+      refreshChallenges();
+    } catch (err) { showMsg(err?.response?.data?.message || 'Failed to send invitation'); }
+    setActionLoading(null);
+  };
+
+  // Phase 3.1.7: Start hub challenge (READY → ACTIVE)
+  const handleStart = async (id) => {
+    if (!isValidObjectId(id)) { showMsg('Cannot start: invalid challenge ID'); return; }
+    setActionLoading(id);
+    try {
+      await challengeApi.startChallenge(id);
+      showMsg('✅ Challenge started!');
       refreshChallenges();
     } catch (err) { showMsg(err?.response?.data?.message || 'Failed'); }
     setActionLoading(null);
@@ -137,9 +169,55 @@ const ChallengesPage = () => {
     setActionLoading(id);
     try {
       await challengeApi.cancelChallenge(id);
-      showMsg('Challenge cancelled');
-      refreshChallenges();
+      // Optimistic removal — socket will remove from all other participants
+      removeChallenge(id);
+      showMsg('Challenge cancelled.');
     } catch (err) { showMsg(err?.response?.data?.message || 'Failed'); }
+    setActionLoading(null);
+  };
+
+  // ── Phase 3.1.7.1: Participation Handlers ─────────
+  // IMPORTANT: For 1v1 decline/leave/cancel, use optimistic removal (removeChallenge)
+  // instead of refreshChallenges(). This prevents the refetch-race where a GET /my
+  // returns the stale challenge before socket events clean up both sides.
+  const handleAccept = async (id) => {
+    if (!isValidObjectId(id)) { showMsg('Cannot accept: invalid challenge ID'); return; }
+    setActionLoading(`accept-${id}`);
+    try {
+      await challengeApi.acceptInvite(id);
+      showMsg('✅ Challenge accepted! Starting now...');
+      // Delay refresh slightly — let socket challenge.updated(PARTICIPANT_ACCEPTED, newStatus=ACTIVE)
+      // arrive first. Socket handler does force refresh anyway.
+      setTimeout(() => refreshChallenges(), 800);
+    } catch (err) { showMsg(err?.response?.data?.message || 'Failed to accept'); }
+    setActionLoading(null);
+  };
+
+  const handleDecline = async (id) => {
+    if (!isValidObjectId(id)) { showMsg('Cannot decline: invalid challenge ID'); return; }
+    if (!confirm('Decline this challenge? For 1v1 challenges, this will cancel the challenge for both players.')) return;
+    setActionLoading(`decline-${id}`);
+    try {
+      await challengeApi.declineInvite(id);
+      // Phase 3.1.7.1: Optimistic removal — remove immediately from decliner's view.
+      // DO NOT call refreshChallenges() — that would race against socket events.
+      // The socket challenge.cancelled event will also remove it from creator's view.
+      removeChallenge(id);
+      showMsg('Challenge declined.');
+    } catch (err) { showMsg(err?.response?.data?.message || 'Failed to decline'); }
+    setActionLoading(null);
+  };
+
+  const handleLeave = async (id) => {
+    if (!isValidObjectId(id)) { showMsg('Cannot leave: invalid challenge ID'); return; }
+    if (!confirm('Leave this challenge?')) return;
+    setActionLoading(`leave-${id}`);
+    try {
+      await challengeApi.leaveChallenge(id);
+      // Optimistic removal for leaver. Socket handles other participants.
+      removeChallenge(id);
+      showMsg('Left the challenge.');
+    } catch (err) { showMsg(err?.response?.data?.message || 'Failed to leave'); }
     setActionLoading(null);
   };
 
@@ -172,7 +250,7 @@ const ChallengesPage = () => {
                         {ROUTING_LABELS[c.routing]?.label || c.type}
                       </span>
                       <span className="challenge-status" style={{ color: STATUS_COLORS[c.status] }}>
-                        {c.status}
+                        {STATUS_LABELS[c.status] || c.status}
                       </span>
                     </div>
                   </div>
@@ -218,28 +296,80 @@ const ChallengesPage = () => {
                   )}
 
                   <div className="challenge-actions">
-                    {['DRAFT', 'PENDING'].includes(c.status) && (
-                      <button className="btn-activate" onClick={() => handleActivate(c._id)}
-                        disabled={actionLoading === c._id}>Activate</button>
-                    )}
-                    {c.status === 'ACTIVE' && (
-                      <button className="btn-submit" onClick={() => setSelectedChallenge(c._id)}>
-                        Submit Proof
-                      </button>
-                    )}
-                    {/* Phase 2.4.3: Resolve button — visible when canResolve is true */}
-                    {!['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(c.status) && c.canResolve && (
-                      <button className="btn-resolve" onClick={() => handleResolve(c._id)}
-                        disabled={actionLoading === c._id}>
-                        {actionLoading === c._id ? '⚙️ Resolving...' : '🏆 Resolve & Determine Winner'}
-                      </button>
-                    )}
-                    {!['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(c.status) && !c.canResolve && c.resolveBlockReason && (
-                      <span className="resolve-blocked" title={c.resolveBlockReason}>⏳ {c.resolveBlockReason}</span>
-                    )}
-                    {!['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(c.status) && (
-                      <button className="btn-cancel-challenge" onClick={() => handleCancel(c._id)}
-                        disabled={actionLoading === c._id}>Cancel</button>
+                    {/* Phase 3.1.7: INVITED — show Accept/Decline */}
+                    {hasInvite(c, myUserId) ? (
+                      <div className="invite-actions">
+                        <div className="invite-banner">
+                          📨 <strong>{c.title}</strong> — You’ve been challenged!
+                        </div>
+                        <button className="btn-accept-invite" id={`accept-invite-${c._id}`}
+                          onClick={() => handleAccept(c._id)}
+                          disabled={actionLoading === `accept-${c._id}`}>
+                          {actionLoading === `accept-${c._id}` ? '⏳ Accepting...' : '✅ Accept Challenge'}
+                        </button>
+                        <button className="btn-decline-invite" id={`decline-invite-${c._id}`}
+                          onClick={() => handleDecline(c._id)}
+                          disabled={actionLoading === `decline-${c._id}`}>
+                          {actionLoading === `decline-${c._id}` ? '⏳...' : '❌ Decline'}
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Phase 3.1.7: DRAFT — creator sends invitation (1v1) or dispatches hub challenge */}
+                        {c.status === 'DRAFT' && c.creatorId === myUserId && (
+                          <button className="btn-activate" id={`dispatch-${c._id}`}
+                            onClick={() => handleDispatchInvite(c._id)}
+                            disabled={actionLoading === c._id}>
+                            {actionLoading === c._id ? '⏳ Sending...' : c.type === 'FRIEND_1V1' ? '📨 Send Challenge' : '📨 Open to Hub'}
+                          </button>
+                        )}
+                        {/* WAITING_FOR_PARTICIPANTS — creator sees pending status */}
+                        {c.status === 'WAITING_FOR_PARTICIPANTS' && c.creatorId === myUserId && (
+                          <span className="resolve-blocked" title="Waiting for opponent to respond">
+                            ⏳ Waiting for opponent response...
+                          </span>
+                        )}
+                        {/* READY — creator can start hub challenge */}
+                        {c.status === 'READY' && c.creatorId === myUserId && c.type !== 'FRIEND_1V1' && (
+                          <button className="btn-activate" id={`start-${c._id}`}
+                            onClick={() => handleStart(c._id)}
+                            disabled={actionLoading === c._id}>
+                            {actionLoading === c._id ? '⏳ Starting...' : '▶️ Start Challenge'}
+                          </button>
+                        )}
+                        {/* ACTIVE: Submit Proof */}
+                        {c.status === 'ACTIVE' && getMyParticipant(c, myUserId)?.status !== 'INVITED' && (
+                          <button className="btn-submit" id={`submit-${c._id}`}
+                            onClick={() => setSelectedChallenge(c._id)}>
+                            Submit Proof
+                          </button>
+                        )}
+                        {/* Resolve */}
+                        {!['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(c.status) && c.canResolve && (
+                          <button className="btn-resolve" id={`resolve-${c._id}`}
+                            onClick={() => handleResolve(c._id)} disabled={actionLoading === c._id}>
+                            {actionLoading === c._id ? '⚙️ Resolving...' : '🏆 Resolve & Determine Winner'}
+                          </button>
+                        )}
+                        {!['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(c.status) && !c.canResolve && c.resolveBlockReason && (
+                          <span className="resolve-blocked" title={c.resolveBlockReason}>⏳ {c.resolveBlockReason}</span>
+                        )}
+                        {/* Leave — non-creator active participants */}
+                        {!['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(c.status)
+                          && c.creatorId !== myUserId
+                          && ['JOINED', 'ACCEPTED'].includes(getMyParticipant(c, myUserId)?.status) && (
+                          <button className="btn-leave-challenge" id={`leave-${c._id}`}
+                            onClick={() => handleLeave(c._id)}
+                            disabled={actionLoading === `leave-${c._id}`}>
+                            {actionLoading === `leave-${c._id}` ? '⏳...' : '🚪 Leave'}
+                          </button>
+                        )}
+                        {/* Cancel — creator only */}
+                        {!['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(c.status) && c.creatorId === myUserId && (
+                          <button className="btn-cancel-challenge" id={`cancel-${c._id}`}
+                            onClick={() => handleCancel(c._id)} disabled={actionLoading === c._id}>Cancel</button>
+                        )}
+                      </>
                     )}
                   </div>
 

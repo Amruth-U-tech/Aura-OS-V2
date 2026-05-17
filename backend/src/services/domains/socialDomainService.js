@@ -1,6 +1,8 @@
 const FriendRequest = require('../../models/FriendRequest');
 const Friendship = require('../../models/Friendship');
 const { FRIEND_REQUEST_STATUS } = require('../../constants/domainConstants');
+const auraEvents = require('../../events/eventBus');
+const { EVENTS } = require('../../events/eventConstants');
 
 // ======================================================
 // SOCIAL DOMAIN SERVICE
@@ -24,7 +26,17 @@ const sendFriendRequest = async (senderId, receiverId, message = '') => {
 
   // Create request (duplicate pending is blocked by unique partial index)
   try {
-    return await FriendRequest.create({ senderId, receiverId, message });
+    const request = await FriendRequest.create({ senderId, receiverId, message });
+
+    // Phase 3.1: Emit domain event after DB commit
+    auraEvents.emitEvent(EVENTS.FRIEND_REQUEST_SENT, {
+      senderId: senderId.toString(),
+      receiverId: receiverId.toString(),
+      requestId: request._id.toString(),
+      message
+    });
+
+    return request;
   } catch (err) {
     if (err.code === 11000) {
       throw Object.assign(new Error('Friend request already pending'), { statusCode: 409 });
@@ -51,6 +63,13 @@ const acceptFriendRequest = async (requestId, receiverId) => {
   // Create symmetric friendship (pre-validate hook sorts userA < userB)
   await Friendship.create({ userA: request.senderId, userB: request.receiverId });
 
+  // Phase 3.1: Emit domain event
+  auraEvents.emitEvent(EVENTS.FRIEND_ACCEPTED, {
+    senderId: request.senderId.toString(),
+    receiverId: request.receiverId.toString(),
+    requestId: request._id.toString()
+  });
+
   return request;
 };
 
@@ -68,6 +87,14 @@ const declineFriendRequest = async (requestId, receiverId) => {
   request.status = FRIEND_REQUEST_STATUS.DECLINED;
   request.respondedAt = new Date();
   await request.save();
+
+  // Phase 3.1: Emit domain event
+  auraEvents.emitEvent(EVENTS.FRIEND_DECLINED, {
+    senderId: request.senderId.toString(),
+    receiverId: request.receiverId.toString(),
+    requestId: request._id.toString()
+  });
+
   return request;
 };
 

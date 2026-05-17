@@ -1,17 +1,21 @@
 const Task = require('../models/Task');
 const historyService = require('./historyService');
-const xpPipeline = require('./orchestration/xpPipeline');
 const { isTransitionAllowed, isTerminal } = require('../utils/taskStateUtils');
 const { TASK_STATUS } = require('../constants/taskConstants');
 const { BEHAVIORAL_EVENT_TYPES } = require('../constants/historyConstants');
 const ERROR_CODES = require('../constants/errorCodes');
+const auraEvents = require('../events/eventBus');
+const { EVENTS } = require('../events/eventConstants');
 
 // ======================================================
-// MISSION LIFECYCLE SERVICE
+// MISSION LIFECYCLE SERVICE — Phase 3.1 (Event-Driven)
 // THE most important file in Phase 2.
 // Owns: ALL lifecycle transitions — completeMission, 
 //       cancelMission, failMission, expireMission
 // ONLY this file may mutate mission lifecycle truth.
+//
+// Phase 3.1: After DB commit, emits domain events.
+// XP/Trust reactions are now handled by event listeners.
 // Must NOT: directly handle HTTP or render UI
 // ======================================================
 
@@ -55,6 +59,7 @@ const _resolveToState = async (userId, missionId, toState, timestampField) => {
 const completeMission = async (userId, missionId) => {
   const mission = await _resolveToState(userId, missionId, TASK_STATUS.COMPLETED, 'completedAt');
 
+  // Record history directly (fast, lightweight)
   await historyService.recordEvent(userId, BEHAVIORAL_EVENT_TYPES.MISSION_COMPLETED, {
     missionId: mission._id,
     title: mission.title,
@@ -62,9 +67,15 @@ const completeMission = async (userId, missionId) => {
     completedAt: mission.completedAt
   });
 
-  // Award XP through the pipeline (creates transaction + profile update)
-  const xpResult = await xpPipeline.awardMissionXp(userId, mission);
-  mission._xpResult = xpResult; // attach for controller response
+  // Phase 3.1: Emit domain event — XP listener will award XP,
+  // socket listener will broadcast live update
+  auraEvents.emitEvent(EVENTS.TASK_COMPLETED, {
+    userId: userId.toString(),
+    missionId: mission._id.toString(),
+    title: mission.title,
+    priority: mission.priority,
+    mission: mission // full mission object for XP pipeline
+  });
 
   return mission;
 };
@@ -77,6 +88,12 @@ const cancelMission = async (userId, missionId) => {
     missionId: mission._id,
     title: mission.title,
     cancelledAt: mission.cancelledAt
+  });
+
+  auraEvents.emitEvent(EVENTS.TASK_CANCELLED, {
+    userId: userId.toString(),
+    missionId: mission._id.toString(),
+    title: mission.title
   });
 
   return mission;
@@ -93,8 +110,14 @@ const failMission = async (userId, missionId) => {
     failedAt: mission.failedAt
   });
 
-  // Penalize XP through the pipeline
-  await xpPipeline.penalizeMissionFailure(userId, mission);
+  // Phase 3.1: Emit event — XP listener will handle penalty
+  auraEvents.emitEvent(EVENTS.TASK_FAILED, {
+    userId: userId.toString(),
+    missionId: mission._id.toString(),
+    title: mission.title,
+    priority: mission.priority,
+    mission: mission
+  });
 
   return mission;
 };
@@ -119,8 +142,14 @@ const expireMission = async (missionId) => {
     expiredAt: mission.expiredAt
   });
 
-  // Penalize XP through the pipeline
-  await xpPipeline.penalizeMissionExpiry(mission.userId, mission);
+  // Phase 3.1: Emit event — XP + Trust listeners will react
+  auraEvents.emitEvent(EVENTS.TASK_EXPIRED, {
+    userId: mission.userId.toString(),
+    missionId: mission._id.toString(),
+    title: mission.title,
+    deadline: mission.deadline,
+    mission: mission
+  });
 
   return mission;
 };

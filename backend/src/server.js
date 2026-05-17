@@ -3,6 +3,8 @@ require('dns').setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
 require('./config/env'); // MUST BE FIRST: validates env variables
 
+const http = require('http');
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -28,6 +30,10 @@ const playerRoutes = require('./routes/playerRoutes');
 const discoveryRoutes = require('./routes/discoveryRoutes');
 // Phase 2.4.2 — Voucher Routes
 const voucherRoutes = require('./routes/voucherRoutes');
+// Phase 3.0 — Realtime Transport Foundation
+const { initializeSocketServer } = require('./realtime');
+// Phase 3.1 — Event Orchestration System
+const { initializeEventSystem } = require('./events');
 
 // ── Lifecycle Schedulers ──────────────────────────────
 const { startScheduler } = require('./services/disciplineSchedulerService');
@@ -95,10 +101,19 @@ app.use((req, res, next) => {
 // Centralized Error Handling
 app.use(errorHandler);
 
-// Start Server
-app.listen(PORT, () => {
+// ── Phase 3.0: Create HTTP server and attach Socket.IO ──
+const httpServer = http.createServer(app);
+
+// Initialize realtime transport layer (Socket.IO)
+const io = initializeSocketServer(httpServer);
+
+// Start Server (httpServer instead of app for Socket.IO support)
+httpServer.listen(PORT, () => {
   console.log(`✅ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
+
+// Phase 3.1: Initialize event orchestration AFTER Socket.IO is ready
+initializeEventSystem();
 
 // Handle unhandled rejections globally to prevent silent crashes
 process.on('unhandledRejection', (err) => {

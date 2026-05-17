@@ -25,7 +25,10 @@ const MAX_DISCOVERY_LIMIT = 20;
 const searchPlayerByAuraId = async (auraPlayerId) => {
   if (!isValid(auraPlayerId, 'PLAYER')) return null;
   const profile = await PlayerProfile.findOne({ auraPlayerId }).lean();
-  return profile ? playerProfileService.sanitizeProfile(profile) : null;
+  if (!profile) return null;
+  const sanitized = playerProfileService.sanitizeProfile(profile);
+  delete sanitized.userId;
+  return sanitized;
 };
 
 // ── Search Players by display name (GLOBAL) ──────────
@@ -41,7 +44,11 @@ const searchPlayersByName = async (query, excludeUserId = null, limit = DEFAULT_
     .limit(safeLimit)
     .lean();
 
-  return profiles.map(playerProfileService.sanitizeProfile);
+  return profiles.map(p => {
+    const sanitized = playerProfileService.sanitizeProfile(p);
+    delete sanitized.userId;
+    return sanitized;
+  });
 };
 
 // ── Random Discoverable Players (GLOBAL) ─────────────
@@ -58,33 +65,17 @@ const discoverRandomPlayers = async (userId, limit = DEFAULT_DISCOVERY_LIMIT) =>
 
   const profiles = await PlayerProfile.aggregate([
     { $match: { userId: { $nin: excludeIds.map(id => require('mongoose').Types.ObjectId.createFromHexString(id.toString())) } } },
-    { $sample: { size: safeLimit } },
-    {
-      $project: {
-        auraPlayerId: 1,
-        displayName: 1,
-        avatar: 1, // Phase 2.4.4: Include avatar for social cards
-        level: 1,
-        xp: 1,
-        trustScore: 1,
-        challengeWins: 1,
-        userId: 1,
-        createdAt: 1,
-        _id: 0
-      }
-    }
+    { $sample: { size: safeLimit } }
   ]);
 
-  return profiles.map(p => ({
-    auraPlayerId: p.auraPlayerId,
-    displayName: p.displayName || 'Unknown',
-    avatar: p.avatar || null,
-    level: p.level,
-    xp: p.xp,
-    trustScore: p.trustScore,
-    challengeWins: p.challengeWins || 0,
-    userId: p.userId?.toString()
-  }));
+  // Use the standard sanitizer to ensure consistent payload structure
+  // We remove userId explicitly here to prevent exposing internal Mongo IDs
+  // as per Phase 3.0.1 hardening requirements.
+  return profiles.map(p => {
+    const sanitized = playerProfileService.sanitizeProfile(p);
+    delete sanitized.userId;
+    return sanitized;
+  });
 };
 
 // ── Search Hubs by AURA-HUB-ID (GLOBAL) ─────────────

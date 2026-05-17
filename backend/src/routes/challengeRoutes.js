@@ -11,6 +11,8 @@ const xpPipeline = require('../services/orchestration/xpPipeline');
 const historyService = require('../services/historyService');
 const { BEHAVIORAL_EVENT_TYPES } = require('../constants/historyConstants');
 const PlayerProfile = require('../models/PlayerProfile');
+const auraEvents = require('../events/eventBus');
+const { EVENTS } = require('../events/eventConstants');
 
 // ======================================================
 // CHALLENGE ROUTES — Phase 2.4.2
@@ -74,8 +76,12 @@ router.post('/', protect, asyncHandler(async (req, res) => {
     } catch { /* already joined or other non-fatal */ }
   }
 
-  await historyService.recordEvent(req.user.id, BEHAVIORAL_EVENT_TYPES.CHALLENGE_CREATED, {
-    challengeId: challenge._id.toString(), title, type,
+  // Phase 3.1: Emit domain event (history listener will persist)
+  auraEvents.emitEvent(EVENTS.CHALLENGE_CREATED, {
+    creatorId: req.user.id,
+    challengeId: challenge._id.toString(),
+    auraChallengeId: challenge.auraChallengeId,
+    title, type,
     routing: type === 'FRIEND_1V1' ? 'ONE_TO_ONE' : 'ONE_TO_MANY'
   });
 
@@ -86,8 +92,13 @@ router.post('/', protect, asyncHandler(async (req, res) => {
 router.post('/:id/join', protect, asyncHandler(async (req, res) => {
   const challenge = await challengeService.joinChallenge(req.params.id, req.user.id);
 
-  await historyService.recordEvent(req.user.id, BEHAVIORAL_EVENT_TYPES.CHALLENGE_JOINED, {
-    challengeId: req.params.id
+  // Phase 3.1: Emit domain event
+  auraEvents.emitEvent(EVENTS.CHALLENGE_JOINED, {
+    userId: req.user.id,
+    challengeId: req.params.id,
+    auraChallengeId: challenge.auraChallengeId,
+    title: challenge.title,
+    participantCount: challenge.participants?.length || 0
   });
 
   sendSuccess(res, challengeService.sanitizeChallenge(challenge), 'Joined challenge');
@@ -117,8 +128,12 @@ router.post('/:id/submit', protect, asyncHandler(async (req, res) => {
     proofImageUrls, proofText
   });
 
-  await historyService.recordEvent(req.user.id, BEHAVIORAL_EVENT_TYPES.CHALLENGE_SUBMITTED, {
-    challengeId: req.params.id, submissionId: submission._id.toString()
+  // Phase 3.1: Emit domain event (history listener will persist)
+  auraEvents.emitEvent(EVENTS.CHALLENGE_SUBMITTED, {
+    userId: req.user.id,
+    challengeId: req.params.id,
+    submissionId: submission._id.toString(),
+    attemptNumber: submission.attemptNumber
   });
 
   // Trigger AI validation IMMEDIATELY

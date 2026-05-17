@@ -2,6 +2,8 @@ const Hub = require('../../models/Hub');
 const HubMembership = require('../../models/HubMembership');
 const HubEvent = require('../../models/HubEvent');
 const { HUB_MEMBER_ROLE, HUB_MEMBER_STATUS, HUB_EVENT_TYPE } = require('../../constants/domainConstants');
+const auraEvents = require('../../events/eventBus');
+const { EVENTS } = require('../../events/eventConstants');
 
 // ======================================================
 // HUB DOMAIN SERVICE
@@ -39,6 +41,15 @@ const createHub = async (ownerUserId, data) => {
     eventType: HUB_EVENT_TYPE.MEMBER_JOINED,
     actorUserId: ownerUserId,
     payload: { role: HUB_MEMBER_ROLE.OWNER, action: 'HUB_CREATED' }
+  });
+
+  // Phase 3.1: Emit domain event
+  auraEvents.emitEvent(EVENTS.HUB_CREATED, {
+    hubId: hub._id.toString(),
+    auraHubId: hub.auraHubId,
+    name: hub.name,
+    ownerId: ownerUserId.toString(),
+    visibility: hub.visibility
   });
 
   return hub;
@@ -143,6 +154,17 @@ const joinHub = async (hubIdParam, userId) => {
     payload: { action: isPending ? 'REQUESTED' : 'JOINED', visibility: hub.visibility }
   });
 
+  // Phase 3.1: Emit domain event for active joins
+  if (!isPending) {
+    auraEvents.emitEvent(EVENTS.HUB_JOINED, {
+      hubId: hubId.toString(),
+      auraHubId: hub.auraHubId,
+      name: hub.name,
+      userId: userId.toString(),
+      memberCount: (hub.memberCount || 0) + 1
+    });
+  }
+
   return {
     membership,
     status: isPending ? 'PENDING' : 'ACTIVE',
@@ -245,6 +267,15 @@ const leaveHub = async (hubId, userId) => {
     hubId,
     eventType: HUB_EVENT_TYPE.MEMBER_LEFT,
     actorUserId: userId
+  });
+
+  // Phase 3.1: Emit domain event
+  const hub = await Hub.findById(hubId).select('auraHubId name').lean();
+  auraEvents.emitEvent(EVENTS.HUB_LEFT, {
+    hubId: hubId.toString(),
+    auraHubId: hub?.auraHubId,
+    name: hub?.name,
+    userId: userId.toString()
   });
 
   return membership;

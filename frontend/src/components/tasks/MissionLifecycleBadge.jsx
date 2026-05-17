@@ -1,4 +1,3 @@
-import React from 'react';
 
 // ======================================================
 // MISSION LIFECYCLE BADGE

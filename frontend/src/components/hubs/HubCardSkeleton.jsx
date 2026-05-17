@@ -1,4 +1,3 @@
-import React from 'react';
 
 // ======================================================
 // HUB CARD SKELETON — Loading placeholder

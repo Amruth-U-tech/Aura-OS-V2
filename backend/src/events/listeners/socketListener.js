@@ -24,6 +24,20 @@ const register = () => {
     });
   });
 
+  // Phase 3.1.4: Emit task.created to player for cross-tab sync
+  auraEvents.registerListener(EVENTS.TASK_CREATED, 'socket:task.created', async (data) => {
+    const auraId = await _resolveAuraPlayerId(data.userId);
+    if (!auraId) return;
+    socketEmitter.emitToPlayer(auraId, 'player.task.created', {
+      taskId: data.taskId,
+      title: data.title,
+      priority: data.priority,
+      status: data.status,
+      deadline: data.deadline,
+      timestamp: Date.now()
+    });
+  });
+
   auraEvents.registerListener(EVENTS.TASK_FAILED, 'socket:task.failed', async (data) => {
     const auraId = await _resolveAuraPlayerId(data.userId);
     if (!auraId) return;
@@ -85,10 +99,16 @@ const register = () => {
   auraEvents.registerListener(EVENTS.FRIEND_REQUEST_SENT, 'socket:friend.request.sent', async (data) => {
     const receiverAuraId = await _resolveAuraPlayerId(data.receiverId);
     if (!receiverAuraId) return;
+    // Phase 3.1.4: Resolve sender name from profile for rich notification
+    const senderProfile = await PlayerProfile.findOne({ userId: data.senderId })
+      .select('displayName auraPlayerId')
+      .lean();
     socketEmitter.playerFriendRequest(receiverAuraId, {
       type: 'INCOMING_REQUEST',
+      requestId: data.requestId,  // CRITICAL: real Mongo ObjectId — prevents rt-* corruption
       senderId: data.senderId,
-      senderName: data.senderName,
+      senderName: senderProfile?.displayName || data.senderName || 'Player',
+      senderAuraId: senderProfile?.auraPlayerId || null,
       message: data.message,
       timestamp: Date.now()
     });
@@ -118,6 +138,40 @@ const register = () => {
   });
 
   // ── Challenge Events → Challenge Room + Players ────
+
+  // Phase 3.1.4: Notify participants when a challenge is created
+  // Critical for cross-account sync — target player sees challenge immediately
+  auraEvents.registerListener(EVENTS.CHALLENGE_CREATED, 'socket:challenge.created', async (data) => {
+    // Notify creator (cross-tab sync)
+    if (data.creatorId) {
+      const creatorAuraId = await _resolveAuraPlayerId(data.creatorId);
+      if (creatorAuraId) {
+        socketEmitter.emitToPlayer(creatorAuraId, 'player.challenge.invite', {
+          type: 'CHALLENGE_CREATED',
+          challengeId: data.challengeId,
+          auraChallengeId: data.auraChallengeId,
+          title: data.title,
+          routing: data.routing,
+          timestamp: Date.now()
+        });
+      }
+    }
+    // In 1v1, also notify the target friend
+    if (data.routing === 'ONE_TO_ONE' && data.targetFriendId) {
+      const targetAuraId = await _resolveAuraPlayerId(data.targetFriendId);
+      if (targetAuraId) {
+        socketEmitter.emitToPlayer(targetAuraId, 'player.challenge.invite', {
+          type: 'CHALLENGE_INVITE',
+          challengeId: data.challengeId,
+          auraChallengeId: data.auraChallengeId,
+          title: data.title,
+          creatorId: data.creatorId,
+          timestamp: Date.now()
+        });
+      }
+    }
+  });
+
   auraEvents.registerListener(EVENTS.CHALLENGE_RESOLVED, 'socket:challenge.resolved', async (data) => {
     if (data.auraChallengeId) {
       socketEmitter.challengeResolved(data.auraChallengeId, {
@@ -158,6 +212,57 @@ const register = () => {
         userId: data.userId,
         participantName: data.participantName,
         participantCount: data.participantCount,
+        timestamp: Date.now()
+      });
+    }
+  });
+
+  // Phase 3.1.5: CHALLENGE_ACTIVATED — notify all participants when challenge goes live
+  auraEvents.registerListener(EVENTS.CHALLENGE_ACTIVATED, 'socket:challenge.activated', async (data) => {
+    if (data.auraChallengeId) {
+      socketEmitter.challengeUpdated(data.auraChallengeId, {
+        type: 'CHALLENGE_ACTIVATED',
+        challengeId: data.challengeId,
+        status: data.status || 'ACTIVE',
+        activatedAt: data.activatedAt,
+        timestamp: Date.now()
+      });
+    }
+  });
+
+  // Phase 3.1.5: CHALLENGE_VALIDATED — notify when a submission is AI-validated
+  auraEvents.registerListener(EVENTS.CHALLENGE_VALIDATED, 'socket:challenge.validated', async (data) => {
+    if (data.auraChallengeId) {
+      socketEmitter.challengeUpdated(data.auraChallengeId, {
+        type: 'SUBMISSION_VALIDATED',
+        userId: data.userId,
+        submissionId: data.submissionId,
+        validationScore: data.validationScore,
+        status: data.validationStatus,
+        timestamp: Date.now()
+      });
+    }
+  });
+
+  // Phase 3.1.5: CHALLENGE_CANCELLED — notify all participants
+  auraEvents.registerListener(EVENTS.CHALLENGE_CANCELLED, 'socket:challenge.cancelled', async (data) => {
+    if (data.auraChallengeId) {
+      socketEmitter.challengeUpdated(data.auraChallengeId, {
+        type: 'CHALLENGE_CANCELLED',
+        challengeId: data.challengeId,
+        status: 'CANCELLED',
+        timestamp: Date.now()
+      });
+    }
+  });
+
+  // Phase 3.1.5: CHALLENGE_EXPIRED — notify all participants when deadline passes
+  auraEvents.registerListener(EVENTS.CHALLENGE_EXPIRED, 'socket:challenge.expired', async (data) => {
+    if (data.auraChallengeId) {
+      socketEmitter.challengeUpdated(data.auraChallengeId, {
+        type: 'CHALLENGE_EXPIRED',
+        challengeId: data.challengeId,
+        status: 'EXPIRED',
         timestamp: Date.now()
       });
     }

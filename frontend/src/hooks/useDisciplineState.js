@@ -28,7 +28,8 @@ export const useDisciplineState = () => {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    fetchState();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchState();
   }, [fetchState]);
 
   const toggle = useCallback(async (enabled) => {

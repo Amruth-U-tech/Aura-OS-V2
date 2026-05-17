@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import challengeApi from '@services/challengeApi';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@context/AuthContext';
+import { useChallenges } from '@context/ChallengeContext';
 import ImageUploadZone from '@components/upload/ImageUploadZone';
 import './ChallengesPage.css';
+
+// Phase 3.1.5: Canonical identity guard — prevents /challenges/undefined/* mutations
+const isValidObjectId = (id) => typeof id === 'string' && /^[a-f\d]{24}$/i.test(id);
 
 // ======================================================
 // CHALLENGES PAGE — Phase 2.4.1
@@ -23,21 +27,27 @@ const ROUTING_LABELS = {
   ONE_TO_MANY: { label: '👥 Hub', color: '#10b981' }
 };
 
+// Computed once at module load — stable across all renders
+// The 1-hour minimum deadline ensures valid creation form state
+const MIN_CHALLENGE_END_AT = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16);
+
 const ChallengesPage = () => {
   const [searchParams] = useSearchParams();
   const friendId = searchParams.get('friend');
   const friendName = searchParams.get('name');
 
   const [tab, setTab] = useState(friendId ? 'create' : 'list');
-  const [challenges, setChallenges] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [message, setMessage] = useState(null);
   const [selectedChallenge, setSelectedChallenge] = useState(null);
   const [proofText, setProofText] = useState('');
   const [proofImageUrls, setProofImageUrls] = useState([]); // Phase 2.4.3: proof images
   const [validationResult, setValidationResult] = useState(null); // Phase 2.4.3: AI result
-  const { authReady } = useAuth();
+  // Auth state consumed by ChallengeContext — no direct usage needed here
+  useAuth();
+
+  // Phase 3.1.1: Consume from ChallengeContext (guaranteed array)
+  const { challenges, loading, refreshChallenges } = useChallenges();
 
   const [form, setForm] = useState({
     title: friendName ? `Challenge for ${friendName}` : '',
@@ -48,20 +58,6 @@ const ChallengesPage = () => {
     stakeType: 'XP',
     endAt: '', // Phase 2.4.2: mandatory deadline
   });
-
-  const loadChallenges = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await challengeApi.getMyChallenges();
-      setChallenges(data?.challenges || []);
-    } catch { }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (!authReady) return; // Phase 2.4.3: Auth hydration guard
-    loadChallenges();
-  }, [loadChallenges, authReady]);
 
   const showMsg = (msg) => { setMessage(msg); setTimeout(() => setMessage(null), 4000); };
 
@@ -74,22 +70,30 @@ const ChallengesPage = () => {
       showMsg('Challenge created!');
       setForm({ title: '', description: '', type: 'FRIEND_1V1', targetFriendId: '', stakeXp: 25, stakeType: 'XP', endAt: '' });
       setTab('list');
-      loadChallenges();
+      refreshChallenges();
     } catch (err) { showMsg(err?.response?.data?.message || 'Failed to create'); }
     setActionLoading(null);
   };
 
   const handleActivate = async (id) => {
+    if (!isValidObjectId(id)) { showMsg('Cannot activate: invalid challenge ID'); return; }
     setActionLoading(id);
     try {
       await challengeApi.activateChallenge(id);
       showMsg('Challenge activated!');
-      loadChallenges();
+      refreshChallenges();
     } catch (err) { showMsg(err?.response?.data?.message || 'Failed'); }
     setActionLoading(null);
   };
 
   const handleSubmitProof = async (id) => {
+    // Phase 3.1.5: CRITICAL guard — prevents /challenges/undefined/submit
+    if (!isValidObjectId(id)) {
+      console.error('[ChallengeSubmit] Missing canonical challenge identity:', id);
+      showMsg('Cannot submit: invalid challenge ID. Try refreshing.');
+      refreshChallenges();
+      return;
+    }
     if (!proofText.trim() && proofImageUrls.length === 0) return;
     setActionLoading(id);
     setValidationResult(null);
@@ -111,28 +115,30 @@ const ChallengesPage = () => {
       }
       setProofText('');
       setProofImageUrls([]);
-      loadChallenges();
+      refreshChallenges();
     } catch (err) { showMsg(err?.response?.data?.message || err?.message || 'Failed'); }
     setActionLoading(null);
   };
 
   const handleResolve = async (id) => {
+    if (!isValidObjectId(id)) { showMsg('Cannot resolve: invalid challenge ID'); return; }
     setActionLoading(id);
     try {
       const result = await challengeApi.resolveChallenge(id);
       showMsg(result?.winnerId ? `Winner determined! XP distributed.` : 'Challenge resolved — no winner.');
-      loadChallenges();
+      refreshChallenges();
     } catch (err) { showMsg(err?.response?.data?.message || 'Failed'); }
     setActionLoading(null);
   };
 
   const handleCancel = async (id) => {
+    if (!isValidObjectId(id)) { showMsg('Cannot cancel: invalid challenge ID'); return; }
     if (!confirm('Cancel this challenge?')) return;
     setActionLoading(id);
     try {
       await challengeApi.cancelChallenge(id);
       showMsg('Challenge cancelled');
-      loadChallenges();
+      refreshChallenges();
     } catch (err) { showMsg(err?.response?.data?.message || 'Failed'); }
     setActionLoading(null);
   };
@@ -155,9 +161,9 @@ const ChallengesPage = () => {
       {tab === 'list' && (
         <div className="challenge-list">
           {loading ? <p className="empty-text">Loading...</p> :
-            challenges.length === 0 ? <p className="empty-text">No challenges yet. Create one!</p> :
-              challenges.map((c) => (
-                <div key={c.id} className="challenge-card">
+            (Array.isArray(challenges) ? challenges : []).length === 0 ? <p className="empty-text">No challenges yet. Create one!</p> :
+              (Array.isArray(challenges) ? challenges : []).map((c) => (
+                <div key={c._id} className="challenge-card">
                   <div className="challenge-header">
                     <span className="challenge-title">{c.title}</span>
                     <div className="challenge-badges">
@@ -176,7 +182,7 @@ const ChallengesPage = () => {
                   <div className="challenge-meta">
                     <span>⚔️ {c.type}</span>
                     <span>💰 {c.stakeXp} XP</span>
-                    <span>👥 {c.participants?.length || 0} players</span>
+                    <span>👥 {(Array.isArray(c.participants) ? c.participants : []).length} players</span>
                     {c.endAt && (
                       <span className="deadline-indicator">
                         ⏰ {new Date(c.endAt) > new Date() ? 
@@ -187,11 +193,11 @@ const ChallengesPage = () => {
                   </div>
 
                   {/* Phase 2.4.3: Inline submissions — scores visible on the card */}
-                  {c.submissions && c.submissions.length > 0 && (
+                  {Array.isArray(c.submissions) && c.submissions.length > 0 && (
                     <div className="submissions-inline">
                       <h4 className="submissions-title">📊 Submissions ({c.submissions.length})</h4>
                       <div className="submissions-list">
-                        {c.submissions
+                        {[...(Array.isArray(c.submissions) ? c.submissions : [])]
                           .sort((a, b) => (b.validationScore || 0) - (a.validationScore || 0))
                           .map((s, idx) => (
                             <div key={s.userId + idx} className={`submission-row ${idx === 0 && c.submissions.length > 1 ? 'leading' : ''}`}>
@@ -213,31 +219,31 @@ const ChallengesPage = () => {
 
                   <div className="challenge-actions">
                     {['DRAFT', 'PENDING'].includes(c.status) && (
-                      <button className="btn-activate" onClick={() => handleActivate(c.id)}
-                        disabled={actionLoading === c.id}>Activate</button>
+                      <button className="btn-activate" onClick={() => handleActivate(c._id)}
+                        disabled={actionLoading === c._id}>Activate</button>
                     )}
                     {c.status === 'ACTIVE' && (
-                      <button className="btn-submit" onClick={() => setSelectedChallenge(c.id)}>
+                      <button className="btn-submit" onClick={() => setSelectedChallenge(c._id)}>
                         Submit Proof
                       </button>
                     )}
                     {/* Phase 2.4.3: Resolve button — visible when canResolve is true */}
                     {!['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(c.status) && c.canResolve && (
-                      <button className="btn-resolve" onClick={() => handleResolve(c.id)}
-                        disabled={actionLoading === c.id}>
-                        {actionLoading === c.id ? '⚙️ Resolving...' : '🏆 Resolve & Determine Winner'}
+                      <button className="btn-resolve" onClick={() => handleResolve(c._id)}
+                        disabled={actionLoading === c._id}>
+                        {actionLoading === c._id ? '⚙️ Resolving...' : '🏆 Resolve & Determine Winner'}
                       </button>
                     )}
                     {!['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(c.status) && !c.canResolve && c.resolveBlockReason && (
                       <span className="resolve-blocked" title={c.resolveBlockReason}>⏳ {c.resolveBlockReason}</span>
                     )}
                     {!['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(c.status) && (
-                      <button className="btn-cancel-challenge" onClick={() => handleCancel(c.id)}
-                        disabled={actionLoading === c.id}>Cancel</button>
+                      <button className="btn-cancel-challenge" onClick={() => handleCancel(c._id)}
+                        disabled={actionLoading === c._id}>Cancel</button>
                     )}
                   </div>
 
-                  {selectedChallenge === c.id && (
+                  {selectedChallenge === c._id && (
                     <div className="proof-form">
                       <textarea placeholder="Describe what you did..."
                         value={proofText} onChange={(e) => setProofText(e.target.value)}
@@ -262,9 +268,9 @@ const ChallengesPage = () => {
                         </div>
                       )}
 
-                      <button className="btn-submit-proof" onClick={() => handleSubmitProof(c.id)}
-                        disabled={actionLoading === c.id || (!proofText.trim() && proofImageUrls.length === 0)}>
-                        {actionLoading === c.id ? '🤖 Validating...' : '🤖 Submit & Validate'}
+                      <button className="btn-submit-proof" onClick={() => handleSubmitProof(c._id)}
+                        disabled={actionLoading === c._id || (!proofText.trim() && proofImageUrls.length === 0)}>
+                        {actionLoading === c._id ? '🤖 Validating...' : '🤖 Submit & Validate'}
                       </button>
 
                       {/* Phase 2.4.3: AI validation result display */}
@@ -341,7 +347,7 @@ const ChallengesPage = () => {
               <input type="datetime-local" value={form.endAt}
                 onChange={(e) => setForm({ ...form, endAt: e.target.value })}
                 className="form-input" required
-                min={new Date(Date.now() + 60*60*1000).toISOString().slice(0, 16)} />
+                min={MIN_CHALLENGE_END_AT} />
             </div>
           </div>
 

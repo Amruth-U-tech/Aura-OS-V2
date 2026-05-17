@@ -314,7 +314,8 @@ const sanitizeChallenge = (c) => {
   if (!c) return null;
   const obj = c.toObject ? c.toObject() : c;
   return {
-    id: obj._id?.toString(),
+    _id: obj._id?.toString(),            // Phase 3.1.5: canonical Mongo ObjectId
+    id: obj._id?.toString(),              // Backward compatibility
     auraChallengeId: obj.auraChallengeId,
     title: obj.title,
     description: obj.description,
@@ -337,7 +338,8 @@ const sanitizeChallenge = (c) => {
     winnerId: obj.winnerId?.toString() || null,
     activatedAt: obj.activatedAt,
     resolvedAt: obj.resolvedAt,
-    createdAt: obj.createdAt
+    createdAt: obj.createdAt,
+    updatedAt: obj.updatedAt,             // Phase 3.1.5: include for staleness detection
   };
 };
 
@@ -345,7 +347,8 @@ const sanitizeSubmission = (s) => {
   if (!s) return null;
   const obj = s.toObject ? s.toObject() : s;
   return {
-    id: obj._id?.toString(),
+    _id: obj._id?.toString(),              // Phase 3.1.5: canonical Mongo ObjectId
+    id: obj._id?.toString(),               // Backward compatibility
     challengeId: obj.challengeId?.toString(),
     userId: obj.userId?.toString(),
     proofImageUrls: obj.proofImageUrls,

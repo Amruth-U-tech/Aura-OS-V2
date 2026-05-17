@@ -81,6 +81,7 @@ router.post('/', protect, asyncHandler(async (req, res) => {
     creatorId: req.user.id,
     challengeId: challenge._id.toString(),
     auraChallengeId: challenge.auraChallengeId,
+    targetFriendId: resolvedTargetId || null,  // Phase 3.1.4: for 1v1 notification
     title, type,
     routing: type === 'FRIEND_1V1' ? 'ONE_TO_ONE' : 'ONE_TO_MANY'
   });
@@ -376,6 +377,14 @@ router.post('/:id/cancel', protect, asyncHandler(async (req, res) => {
   const c = await challengeService.transitionState(req.params.id, 'CANCELLED');
   await historyService.recordEvent(req.user.id, BEHAVIORAL_EVENT_TYPES.CHALLENGE_CANCELLED, {
     challengeId: req.params.id
+  });
+
+  // Phase 3.1.5: Emit domain event for socket transport
+  auraEvents.emitEvent(EVENTS.CHALLENGE_CANCELLED, {
+    challengeId: req.params.id,
+    auraChallengeId: challenge.auraChallengeId,
+    creatorId: req.user.id,
+    title: challenge.title
   });
 
   sendSuccess(res, challengeService.sanitizeChallenge(c), 'Challenge cancelled');

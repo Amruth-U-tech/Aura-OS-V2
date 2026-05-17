@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import hubApi from '@services/hubApi';
 import discoveryApi from '@services/discoveryApi';
 import { useAuth } from '@context/AuthContext';
+import { useHubs } from '@context/HubContext';
 import './HubsPage.css';
 
 // ======================================================
@@ -19,7 +20,6 @@ const VISIBILITY_BADGES = {
 
 const HubsPage = () => {
   const [tab, setTab] = useState('list');
-  const [hubs, setHubs] = useState([]);
   const [discoveredHubs, setDiscoveredHubs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
@@ -27,33 +27,31 @@ const HubsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const { authReady } = useAuth();
 
+  // Phase 3.1.1: Consume from HubContext (guaranteed array)
+  const { hubs, loading: hubsLoading, refreshHubs } = useHubs();
+
   const [form, setForm] = useState({ name: '', description: '', visibility: 'PUBLIC', maxMembers: 50 });
 
   const showMsg = (msg) => { setMessage(msg); setTimeout(() => setMessage(null), 4000); };
-
-  const loadHubs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await hubApi.getMyHubs();
-      setHubs(data?.hubs || []);
-    } catch { }
-    setLoading(false);
-  }, []);
 
   const loadDiscovery = useCallback(async () => {
     setLoading(true);
     try {
       const data = await discoveryApi.getRandomHubs(15);
       setDiscoveredHubs(Array.isArray(data) ? data : []);
-    } catch { setDiscoveredHubs([]); }
+    } catch (err) {
+      console.warn('[Hubs] Discovery failed:', err?.message);
+      setDiscoveredHubs([]);
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    if (!authReady) return; // Phase 2.4.3: Auth hydration guard
-    if (tab === 'list') loadHubs();
-    if (tab === 'discover') loadDiscovery();
-  }, [tab, authReady, loadHubs, loadDiscovery]);
+    if (!authReady) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (tab === 'discover') void loadDiscovery();
+    // hubs are auto-loaded by HubContext
+  }, [tab, authReady, loadDiscovery]);
 
   const handleSearch = async () => {
     if (searchQuery.length < 2) return;
@@ -61,7 +59,10 @@ const HubsPage = () => {
     try {
       const data = await discoveryApi.searchHubs(searchQuery);
       setDiscoveredHubs(Array.isArray(data) ? data : []);
-    } catch { setDiscoveredHubs([]); }
+    } catch (err) {
+      console.warn('[Hubs] Search failed:', err?.message);
+      setDiscoveredHubs([]);
+    }
     setLoading(false);
   };
 
@@ -74,7 +75,7 @@ const HubsPage = () => {
       showMsg('Hub created!');
       setForm({ name: '', description: '', visibility: 'PUBLIC', maxMembers: 50 });
       setTab('list');
-      loadHubs();
+      refreshHubs();
     } catch (err) { showMsg(err?.response?.data?.message || 'Failed'); }
     setActionLoading(null);
   };
@@ -85,7 +86,7 @@ const HubsPage = () => {
       await hubApi.joinHub(id);
       showMsg('Joined hub!');
       loadDiscovery();
-      loadHubs();
+      refreshHubs();
     } catch (err) { showMsg(err?.response?.data?.message || 'Failed to join'); }
     setActionLoading(null);
   };
@@ -96,7 +97,7 @@ const HubsPage = () => {
     try {
       await hubApi.leaveHub(id);
       showMsg('Left hub');
-      loadHubs();
+      refreshHubs();
     } catch (err) { showMsg(err?.response?.data?.message || 'Failed'); }
     setActionLoading(null);
   };
@@ -117,7 +118,7 @@ const HubsPage = () => {
 
       <div className="hub-tabs">
         <button className={`tab-btn ${tab === 'list' ? 'active' : ''}`} onClick={() => setTab('list')}>
-          My Hubs {hubs.length > 0 && <span className="badge-count">{hubs.length}</span>}
+          My Hubs {(Array.isArray(hubs) ? hubs : []).length > 0 && <span className="badge-count">{hubs.length}</span>}
         </button>
         <button className={`tab-btn ${tab === 'discover' ? 'active' : ''}`} onClick={() => setTab('discover')}>
           🔍 Discover
@@ -130,10 +131,10 @@ const HubsPage = () => {
       {/* ── My Hubs ──────────────────────────────── */}
       {tab === 'list' && (
         <div className="hub-list">
-          {loading ? <p className="empty-text">Loading...</p> :
-            hubs.length === 0 ? <p className="empty-text">No hubs yet. Discover or create one!</p> :
-              hubs.map((h, i) => (
-                <div key={h.id || i} className="hub-card">
+          {(hubsLoading || loading) ? <p className="empty-text">Loading...</p> :
+            (Array.isArray(hubs) ? hubs : []).length === 0 ? <p className="empty-text">No hubs yet. Discover or create one!</p> :
+              (Array.isArray(hubs) ? hubs : []).map((h, i) => (
+                <div key={h._id || h.id || i} className="hub-card">
                   <div className="hub-icon">🌐</div>
                   <div className="hub-info">
                     <span className="hub-name">{h.name}</span>

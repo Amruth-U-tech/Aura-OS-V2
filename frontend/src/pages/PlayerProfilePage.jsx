@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import playerApi from '@services/playerApi';
 import { useAuth } from '@context/AuthContext';
@@ -128,7 +128,7 @@ const PlayerProfilePage = () => {
         <div className="profile-section">
           <h2 className="section-title">Skills & Certificates</h2>
           <div className="skills-grid">
-            {profile.skills.map((skill, i) => (
+            {(Array.isArray(profile.skills) ? profile.skills : []).map((skill, i) => (
               <div key={i} className={`skill-card ${skill.verified ? 'verified' : ''}`}>
                 <div className="skill-header">
                   <span className="skill-name">{skill.name}</span>
@@ -224,7 +224,7 @@ const PlayerProfilePage = () => {
         <div className="profile-section">
           <h2 className="section-title">Achievements</h2>
           <div className="achievements-grid">
-            {profile.achievements.map((a, i) => (
+            {(Array.isArray(profile.achievements) ? profile.achievements : []).map((a, i) => (
               <div key={i} className="achievement-card">
                 <span className="achievement-icon">{a.icon || '🏅'}</span>
                 <span className="achievement-title">{a.title}</span>

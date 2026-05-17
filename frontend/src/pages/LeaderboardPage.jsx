@@ -1,12 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import playerApi from '@services/playerApi';
+import { fetchOrchestrator } from '@utils/fetchOrchestrator';
 import { useAuth } from '@context/AuthContext';
 import './LeaderboardPage.css';
 
 // ======================================================
-// LEADERBOARD PAGE — Phase 2.4
+// LEADERBOARD PAGE — Phase 3.1.3 (Orchestrated)
 // Real leaderboard from /api/v1/player/leaderboard
+//
+// Phase 3.1.3:
+//   - Fetches routed through fetchOrchestrator
+//   - Filter-specific cache keys prevent stale data
+//   - 10s cooldown (leaderboard is low-priority)
 // ======================================================
 
 const TIER_ICONS = {
@@ -24,20 +30,32 @@ const LeaderboardPage = () => {
   const [weekly, setWeekly] = useState(false);
   const [isWeekly, setIsWeekly] = useState(false);
 
-  useEffect(() => {
-    if (!authReady) return; // Phase 2.4.3: Auth hydration guard
-    const load = async () => {
-      setLoading(true);
-      try {
-        const data = await playerApi.getLeaderboard({ page, limit: 20, sortBy, weekly });
-        setPlayers(data?.profiles || []);
+  const loadLeaderboard = useCallback(async () => {
+    if (!authReady) return;
+    setLoading(true);
+    try {
+      const data = await fetchOrchestrator.fetch(
+        `leaderboard.${sortBy}.${weekly ? 'weekly' : 'all'}.p${page}`,
+        () => playerApi.getLeaderboard({ page, limit: 20, sortBy, weekly }),
+        { cooldownMs: 10000 }
+      );
+      if (data) {
+        setPlayers(Array.isArray(data?.profiles) ? data.profiles : []);
         setTotalPages(data?.pagination?.totalPages || 1);
         setIsWeekly(data?.isWeekly || false);
-      } catch { }
-      setLoading(false);
-    };
-    load();
+      }
+    } catch (err) {
+      if (err?.type !== 'rate_limited') {
+        console.warn('[Leaderboard] Failed to load:', err?.message);
+      }
+    }
+    setLoading(false);
   }, [page, sortBy, weekly, authReady]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadLeaderboard();
+  }, [loadLeaderboard]);
 
   const getRankBadge = (idx) => {
     const rank = (page - 1) * 20 + idx + 1;
@@ -66,11 +84,10 @@ const LeaderboardPage = () => {
 
       <div className="lb-list">
         {loading ? <p className="empty-text">Loading...</p> :
-          players.length === 0 ? <p className="empty-text">No players yet</p> :
-            players.map((p, idx) => (
+          (Array.isArray(players) ? players : []).length === 0 ? <p className="empty-text">No players yet</p> :
+            (Array.isArray(players) ? players : []).map((p, idx) => (
               <div key={p.auraPlayerId || idx} className={`lb-row ${idx < 3 ? 'lb-top' : ''}`}>
                 <span className="lb-rank">{getRankBadge(idx)}</span>
-                {/* Phase 2.4.3: Click avatar/name to navigate to public profile */}
                 <div className="lb-avatar lb-clickable"
                   onClick={() => p.auraPlayerId && navigate(`/player/${p.auraPlayerId}`)}
                   title={`View ${p.displayName || 'Player'}'s profile`}

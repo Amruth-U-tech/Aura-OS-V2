@@ -3,6 +3,8 @@ const historyService = require('./historyService');
 const { validateMissionCreate } = require('../validators/taskValidator');
 const { TASK_STATUS, TASK_PRIORITY } = require('../constants/taskConstants');
 const { BEHAVIORAL_EVENT_TYPES } = require('../constants/historyConstants');
+const auraEvents = require('../events/eventBus');
+const { EVENTS } = require('../events/eventConstants');
 const ERROR_CODES = require('../constants/errorCodes');
 
 // ======================================================
@@ -39,6 +41,17 @@ const createMission = async (userId, missionData) => {
     missionId: mission._id,
     title: mission.title,
     priority: mission.priority,
+    deadline: mission.deadline
+  });
+
+  // ── Step 4: Emit domain event (Phase 3.1.4) ────────
+  // Enables cross-tab realtime sync for the same account
+  auraEvents.emitEvent(EVENTS.TASK_CREATED, {
+    userId: userId.toString(),
+    taskId: mission._id.toString(),
+    title: mission.title,
+    priority: mission.priority,
+    status: mission.status,
     deadline: mission.deadline
   });
 

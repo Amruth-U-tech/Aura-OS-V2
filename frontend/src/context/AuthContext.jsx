@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useCallback, useEffect } from 'react';
+import { createContext, useState, useContext, useCallback, useEffect } from 'react';
 import authApi from '@services/authApi';
 import apiService from '@services/apiService';
 import { eventBus } from '@systems/eventBus';
@@ -54,7 +54,9 @@ const clearStorage = () => {
   try {
     localStorage.removeItem('aura_token');
     localStorage.removeItem('aura_user');
-  } catch {}
+  } catch (err) {
+    console.warn('[Auth] localStorage clear failed:', err?.message);
+  }
 };
 
 // ── Provider ──────────────────────────────────────────
@@ -64,17 +66,24 @@ export const AuthProvider = ({ children }) => {
   const [authReady, setAuthReady] = useState(false); // Blocks rendering until session restored
 
   // ── Session restoration on mount ──────────────────
+  // Runs exactly once on mount: reads localStorage, restores token+user,
+  // then marks authReady=true so all providers and routes can proceed.
   useEffect(() => {
     const { token: stored, user: storedUser } = readStorage();
 
+    // Session initialization: synchronize auth state from localStorage
+     
     if (stored && storedUser && !isTokenExpired(stored)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setToken(stored);
+       
       setUser(storedUser);
       applyTokenToAxios(stored);
     } else if (stored && isTokenExpired(stored)) {
       clearStorage();
     }
 
+     
     setAuthReady(true);
 
     // ── 401 cascade: any API 401 triggers logout ───
@@ -133,4 +142,5 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);

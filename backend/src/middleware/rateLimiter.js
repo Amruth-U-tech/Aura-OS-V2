@@ -10,7 +10,7 @@ const ERROR_CODES = require('../constants/errorCodes');
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 300, // Phase 3.1.4: Increased from 100 — realtime app needs headroom for reconnect hydration + normal usage
   handler: (req, res, next, options) => {
     sendError(res, 'Too many requests, please try again later.', 429, null, ERROR_CODES.RATE_LIMITED);
   },

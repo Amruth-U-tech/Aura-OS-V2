@@ -1,4 +1,3 @@
-import React from 'react';
 import { useDisciplineState } from '@hooks/useDisciplineState';
 
 // ======================================================

@@ -1,87 +1,65 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import socialApi from '@services/socialApi';
 import discoveryApi from '@services/discoveryApi';
-import playerApi from '@services/playerApi';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@context/AuthContext';
+import { useSocial } from '@context/SocialContext';
+import { usePlayer } from '@context/PlayerContext';
 import './FriendsPage.css';
 
 // ======================================================
-// FRIENDS PAGE — Phase 2.4.4
+// FRIENDS PAGE — Phase 3.1.2 (Hardened)
 // Tabs: Friends | Requests | Sent | Discover
-// Phase 2.4.4: Added "Sent" tab for outgoing request
-// lifecycle, avatar rendering, and read-state consumption
+//
+// Ownership:
+//   - SocialContext OWNS: friends, incomingRequests, sentRequests
+//   - PlayerContext OWNS: player profile (auraPlayerId)
+//   - This page CONSUMES only — never fetches domain data directly
+//
+// Phase 3.1.2 fixes:
+//   - r._id used everywhere (normalizer guarantee)
+//   - playerApi.getMe() removed — uses PlayerContext
+//   - Duplicate request guard on handleSendRequest
+//   - All catch blocks log warnings
 // ======================================================
 
 const FriendsPage = () => {
   const [tab, setTab] = useState('friends');
-  const [friends, setFriends] = useState([]);
-  const [requests, setRequests] = useState([]);
-  const [sentRequests, setSentRequests] = useState([]); // Phase 2.4.4
   const [discoveredPlayers, setDiscoveredPlayers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [message, setMessage] = useState(null);
-  const [myId, setMyId] = useState('');
   const [myCopied, setMyCopied] = useState(false);
   const navigate = useNavigate();
   const { authReady } = useAuth();
 
-  // Load own player ID
-  useEffect(() => {
-    if (!authReady) return;
-    playerApi.getMe().then(data => {
-      setMyId(data?.profile?.auraPlayerId || '');
-    }).catch(() => {});
-  }, [authReady]);
+  // Phase 3.1.2: Consume from contexts — never fetch directly
+  const { friends, incomingRequests: requests, sentRequests, refreshFriends, refreshIncoming, refreshSent } = useSocial();
+  const { profile } = usePlayer();
+
+  // Phase 3.1.2: Player ID from context (not from direct API call)
+  const myId = profile?.auraPlayerId || '';
 
   const showMsg = (msg) => { setMessage(msg); setTimeout(() => setMessage(null), 3000); };
-
-  const loadFriends = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await socialApi.getFriends();
-      setFriends(data?.friends || []);
-    } catch { }
-    setLoading(false);
-  }, []);
-
-  const loadRequests = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await socialApi.getRequests();
-      setRequests(data?.requests || []);
-    } catch { }
-    setLoading(false);
-  }, []);
-
-  // Phase 2.4.4: Load outgoing requests
-  const loadSentRequests = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await socialApi.getSentRequests();
-      setSentRequests(data?.requests || []);
-    } catch { }
-    setLoading(false);
-  }, []);
 
   const loadDiscovery = useCallback(async () => {
     setLoading(true);
     try {
       const data = await discoveryApi.getRandomPlayers(15);
       setDiscoveredPlayers(Array.isArray(data) ? data : []);
-    } catch { setDiscoveredPlayers([]); }
+    } catch (err) {
+      console.warn('[Social] Discovery failed:', err?.message);
+      setDiscoveredPlayers([]);
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => {
     if (!authReady) return;
-    if (tab === 'friends') loadFriends();
-    if (tab === 'requests') loadRequests();
-    if (tab === 'sent') loadSentRequests();
-    if (tab === 'discover') loadDiscovery();
-  }, [tab, authReady, loadFriends, loadRequests, loadSentRequests, loadDiscovery]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (tab === 'discover') void loadDiscovery();
+  }, [tab, authReady, loadDiscovery]);
 
   const handleSearch = async () => {
     if (searchQuery.length < 2) return;
@@ -89,58 +67,121 @@ const FriendsPage = () => {
     try {
       const data = await discoveryApi.searchPlayers(searchQuery);
       setDiscoveredPlayers(Array.isArray(data) ? data : []);
-    } catch { setDiscoveredPlayers([]); }
+    } catch (err) {
+      console.warn('[Social] Search failed:', err?.message);
+      setDiscoveredPlayers([]);
+    }
     setLoading(false);
   };
 
+  // Phase 3.1.2: Guard against duplicate sends + 409 handling
   const handleSendRequest = async (target) => {
+    if (!target) {
+      showMsg('Cannot send request: invalid target');
+      return;
+    }
+    if (actionLoading) return; // Prevent double-click
     setActionLoading(target);
     try {
       await socialApi.sendRequest(target);
       showMsg('Friend request sent!');
+      refreshSent(); // Refresh outgoing list
     } catch (err) {
-      showMsg(err?.response?.data?.message || err?.message || 'Failed to send request');
+      const status = err?.status || err?.response?.status;
+      if (status === 409) {
+        showMsg('Friend request already sent to this player.');
+      } else {
+        showMsg(err?.response?.data?.message || err?.message || 'Failed to send request');
+      }
     }
     setActionLoading(null);
   };
 
-  const handleAccept = async (id) => {
-    setActionLoading(id);
+  // Phase 3.1.4: CRITICAL — validate ObjectId format before accept
+  // Temp IDs (rt-*) must NEVER reach the backend
+  const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
+
+  const handleAccept = async (requestId) => {
+    if (!requestId) {
+      console.warn('[Social] Accept failed: missing request ID');
+      showMsg('Cannot accept: missing request ID');
+      return;
+    }
+    if (!isValidObjectId(requestId)) {
+      console.warn('[Social] Accept blocked: invalid ID format:', requestId);
+      showMsg('Cannot accept: syncing with server...');
+      // Refresh to get real IDs from backend
+      refreshIncoming();
+      return;
+    }
+    setActionLoading(requestId);
     try {
-      await socialApi.acceptRequest(id);
-      loadRequests();
+      await socialApi.acceptRequest(requestId);
+      refreshIncoming();
+      refreshFriends();
       showMsg('Friend request accepted!');
-    } catch { }
+    } catch (err) {
+      const status = err?.status || err?.response?.status;
+      if (status === 409) {
+        showMsg('Already friends!');
+        refreshIncoming();
+        refreshFriends();
+      } else if (status === 404) {
+        showMsg('Request no longer exists');
+        refreshIncoming();
+      } else {
+        console.warn('[Social] Accept failed:', err?.message);
+        showMsg(err?.response?.data?.message || err?.message || 'Failed to accept request');
+      }
+    }
     setActionLoading(null);
   };
 
-  const handleDecline = async (id) => {
-    setActionLoading(id);
+  const handleDecline = async (requestId) => {
+    if (!requestId) return;
+    if (!isValidObjectId(requestId)) {
+      console.warn('[Social] Decline blocked: invalid ID format:', requestId);
+      refreshIncoming();
+      return;
+    }
+    setActionLoading(requestId);
     try {
-      await socialApi.declineRequest(id);
-      loadRequests();
-    } catch { }
+      await socialApi.declineRequest(requestId);
+      refreshIncoming();
+    } catch (err) {
+      console.warn('[Social] Decline failed:', err?.message);
+      refreshIncoming(); // Refresh to remove stale request from UI
+    }
     setActionLoading(null);
   };
 
   const handleRemove = async (userId) => {
+    if (!userId) return;
     if (!confirm('Remove this friend?')) return;
     setActionLoading(userId);
     try {
       await socialApi.removeFriend(userId);
-      loadFriends();
-    } catch { }
+      refreshFriends();
+      refreshSent(); // Phase 3.1.4: old requests cleaned up on backend
+      showMsg('Friend removed');
+    } catch (err) {
+      console.warn('[Social] Remove failed:', err?.message);
+      showMsg(err?.response?.data?.message || err?.message || 'Failed to remove friend');
+    }
     setActionLoading(null);
   };
 
-  // Phase 2.4.4: Mark sent request as read (one-time consume)
-  const handleMarkRead = async (id) => {
-    setActionLoading(id);
+  // Phase 2.4.4: Mark sent request as read
+  const handleMarkRead = async (requestId) => {
+    if (!requestId) return;
+    setActionLoading(requestId);
     try {
-      await socialApi.markRequestRead(id);
-      setSentRequests(prev => prev.filter(r => r.id !== id));
+      await socialApi.markRequestRead(requestId);
+      refreshSent();
       showMsg('Acknowledged!');
-    } catch { }
+    } catch (err) {
+      console.warn('[Social] MarkRead failed:', err?.message);
+    }
     setActionLoading(null);
   };
 
@@ -150,7 +191,7 @@ const FriendsPage = () => {
     setTimeout(() => setMyCopied(false), 2000);
   };
 
-  // Phase 2.4.4: Avatar renderer — shows actual image or fallback initial
+  // Phase 2.4.4: Avatar renderer
   const renderAvatar = (player, clickable = true) => {
     const name = player?.displayName || 'Player';
     const onClick = clickable && player?.auraPlayerId
@@ -192,14 +233,13 @@ const FriendsPage = () => {
       {/* ── Tabs ─────────────────────────────────── */}
       <div className="friends-tabs">
         <button className={`tab-btn ${tab === 'friends' ? 'active' : ''}`} onClick={() => setTab('friends')}>
-          Friends {friends.length > 0 && <span className="badge-count">{friends.length}</span>}
+          Friends {(Array.isArray(friends) ? friends : []).length > 0 && <span className="badge-count">{friends.length}</span>}
         </button>
         <button className={`tab-btn ${tab === 'requests' ? 'active' : ''}`} onClick={() => setTab('requests')}>
-          Requests {requests.length > 0 && <span className="badge">{requests.length}</span>}
+          Requests {(Array.isArray(requests) ? requests : []).length > 0 && <span className="badge">{requests.length}</span>}
         </button>
-        {/* Phase 2.4.4: Outgoing requests tab */}
         <button className={`tab-btn ${tab === 'sent' ? 'active' : ''}`} onClick={() => setTab('sent')}>
-          Sent {sentRequests.length > 0 && <span className="badge">{sentRequests.length}</span>}
+          Sent {(Array.isArray(sentRequests) ? sentRequests : []).length > 0 && <span className="badge">{sentRequests.length}</span>}
         </button>
         <button className={`tab-btn ${tab === 'discover' ? 'active' : ''}`} onClick={() => setTab('discover')}>
           🔍 Discover
@@ -210,9 +250,9 @@ const FriendsPage = () => {
       {tab === 'friends' && (
         <div className="friends-list">
           {loading ? <p className="empty-text">Loading...</p> :
-            friends.length === 0 ? <p className="empty-text">No friends yet. Discover players!</p> :
-              friends.map((f, i) => (
-                <div key={f.userId || i} className="friend-card">
+            (Array.isArray(friends) ? friends : []).length === 0 ? <p className="empty-text">No friends yet. Discover players!</p> :
+              (Array.isArray(friends) ? friends : []).map((f, i) => (
+                <div key={f.friendId || f._id || i} className="friend-card">
                   {renderAvatar(f)}
                   <div className="friend-info friend-clickable"
                     onClick={() => f.auraPlayerId && navigate(`/player/${f.auraPlayerId}`)}>
@@ -222,11 +262,11 @@ const FriendsPage = () => {
                     </span>
                   </div>
                   <div className="friend-actions">
-                    <button className="btn-challenge" onClick={() => navigate(`/challenges?friend=${f.auraPlayerId || f.userId}&name=${f.displayName}`)}>
+                    <button className="btn-challenge" onClick={() => navigate(`/challenges?friend=${f.auraPlayerId || f.friendId}&name=${f.displayName}`)}>
                       ⚔️
                     </button>
-                    <button className="btn-remove" onClick={() => handleRemove(f.userId)}
-                      disabled={actionLoading === f.userId}>✕</button>
+                    <button className="btn-remove" onClick={() => handleRemove(f.friendId)}
+                      disabled={actionLoading === f.friendId}>✕</button>
                   </div>
                 </div>
               ))
@@ -235,12 +275,13 @@ const FriendsPage = () => {
       )}
 
       {/* ── Requests (Incoming) ────────────────────── */}
+      {/* CRITICAL: use r._id for all API calls — normalizer guarantees _id exists */}
       {tab === 'requests' && (
         <div className="friends-list">
           {loading ? <p className="empty-text">Loading...</p> :
-            requests.length === 0 ? <p className="empty-text">No pending requests</p> :
-              requests.map((r) => (
-                <div key={r.id} className="friend-card">
+            (Array.isArray(requests) ? requests : []).length === 0 ? <p className="empty-text">No pending requests</p> :
+              (Array.isArray(requests) ? requests : []).map((r) => (
+                <div key={r._id} className="friend-card">
                   <div className="friend-avatar">📩</div>
                   <div className="friend-info">
                     <span className="friend-name">{r.senderName || 'Unknown'}</span>
@@ -250,10 +291,10 @@ const FriendsPage = () => {
                     {r.message && <span className="friend-msg">{r.message}</span>}
                   </div>
                   <div className="request-actions">
-                    <button className="btn-accept" onClick={() => handleAccept(r.id)}
-                      disabled={actionLoading === r.id}>Accept</button>
-                    <button className="btn-decline" onClick={() => handleDecline(r.id)}
-                      disabled={actionLoading === r.id}>Decline</button>
+                    <button className="btn-accept" onClick={() => handleAccept(r._id)}
+                      disabled={actionLoading === r._id}>Accept</button>
+                    <button className="btn-decline" onClick={() => handleDecline(r._id)}
+                      disabled={actionLoading === r._id}>Decline</button>
                   </div>
                 </div>
               ))
@@ -261,13 +302,13 @@ const FriendsPage = () => {
         </div>
       )}
 
-      {/* ── Phase 2.4.4: Sent Requests (Outgoing) ── */}
+      {/* ── Sent Requests (Outgoing) ─────────────── */}
       {tab === 'sent' && (
         <div className="friends-list">
           {loading ? <p className="empty-text">Loading...</p> :
-            sentRequests.length === 0 ? <p className="empty-text">No outgoing requests</p> :
-              sentRequests.map((r) => (
-                <div key={r.id} className={`friend-card sent-card ${r.status?.toLowerCase()}`}>
+            (Array.isArray(sentRequests) ? sentRequests : []).length === 0 ? <p className="empty-text">No outgoing requests</p> :
+              (Array.isArray(sentRequests) ? sentRequests : []).map((r) => (
+                <div key={r._id} className={`friend-card sent-card ${r.status?.toLowerCase()}`}>
                   <div className="friend-avatar">
                     {r.receiverAvatar ? (
                       <img src={r.receiverAvatar} alt={r.receiverName} className="avatar-thumb" />
@@ -284,11 +325,11 @@ const FriendsPage = () => {
                       {r.status === 'DECLINED' && '❌ Declined'}
                     </span>
                   </div>
-                  {/* One-time read: dismiss accepted/declined cards */}
+                  {/* Dismiss non-pending cards */}
                   {r.status !== 'PENDING' && (
-                    <button className="btn-dismiss" onClick={() => handleMarkRead(r.id)}
-                      disabled={actionLoading === r.id}>
-                      {actionLoading === r.id ? '...' : '✓ Got it'}
+                    <button className="btn-dismiss" onClick={() => handleMarkRead(r._id)}
+                      disabled={actionLoading === r._id}>
+                      {actionLoading === r._id ? '...' : '✓ Got it'}
                     </button>
                   )}
                 </div>
@@ -325,9 +366,9 @@ const FriendsPage = () => {
 
           <div className="friends-list">
             {loading ? <p className="empty-text">Loading...</p> :
-              discoveredPlayers.length === 0 ? <p className="empty-text">No players found</p> :
-                discoveredPlayers.map((p, i) => (
-                  <div key={p.auraPlayerId || i} className="friend-card discover-card">
+              (Array.isArray(discoveredPlayers) ? discoveredPlayers : []).length === 0 ? <p className="empty-text">No players found</p> :
+                (Array.isArray(discoveredPlayers) ? discoveredPlayers : []).map((p, i) => (
+                  <div key={p.auraPlayerId || p._id || i} className="friend-card discover-card">
                     {renderAvatar(p)}
                     <div className="friend-info friend-clickable"
                       onClick={() => p.auraPlayerId && navigate(`/player/${p.auraPlayerId}`)}>

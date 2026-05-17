@@ -1,4 +1,4 @@
-import apiService from '@services/apiService';
+// notificationApi — placeholder for Phase 2+ endpoints
 
 // ======================================================
 // NOTIFICATION API

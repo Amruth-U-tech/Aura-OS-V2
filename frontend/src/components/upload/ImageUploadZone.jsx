@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import uploadApi from '@services/uploadApi';
 import './ImageUploadZone.css';
 

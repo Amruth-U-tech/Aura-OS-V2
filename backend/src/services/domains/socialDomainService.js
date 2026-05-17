@@ -60,8 +60,32 @@ const acceptFriendRequest = async (requestId, receiverId) => {
   request.respondedAt = new Date();
   await request.save();
 
-  // Create symmetric friendship (pre-validate hook sorts userA < userB)
-  await Friendship.create({ userA: request.senderId, userB: request.receiverId });
+  // Phase 3.1.4: Create or reactivate friendship (handles E11000 gracefully)
+  // Sort to match the stored order (userA < userB)
+  const a = request.senderId.toString() < request.receiverId.toString() ? request.senderId : request.receiverId;
+  const b = request.senderId.toString() < request.receiverId.toString() ? request.receiverId : request.senderId;
+
+  try {
+    // Try to reactivate an existing inactive friendship first
+    const existing = await Friendship.findOneAndUpdate(
+      { userA: a, userB: b },
+      { $set: { isActive: true, establishedAt: new Date() } },
+      { upsert: true, new: true }
+    );
+    if (!existing) {
+      await Friendship.create({ userA: a, userB: b });
+    }
+  } catch (err) {
+    if (err.code === 11000) {
+      // Already friends — not an error, just ensure active
+      await Friendship.findOneAndUpdate(
+        { userA: a, userB: b },
+        { $set: { isActive: true } }
+      );
+    } else {
+      throw err;
+    }
+  }
 
   // Phase 3.1: Emit domain event
   auraEvents.emitEvent(EVENTS.FRIEND_ACCEPTED, {
@@ -111,6 +135,19 @@ const removeFriendship = async (userIdA, userIdB) => {
   );
 
   if (!result) throw Object.assign(new Error('Friendship not found'), { statusCode: 404 });
+
+  // Phase 3.1.4: Clean up old ACCEPTED friend requests between these users
+  // so they can send NEW friend requests to each other again.
+  // The unique partial index only blocks PENDING duplicates, but stale
+  // ACCEPTED records can confuse the UI and prevent clean re-requests.
+  await FriendRequest.deleteMany({
+    $or: [
+      { senderId: userIdA, receiverId: userIdB },
+      { senderId: userIdB, receiverId: userIdA }
+    ],
+    status: { $in: [FRIEND_REQUEST_STATUS.ACCEPTED, FRIEND_REQUEST_STATUS.DECLINED] }
+  });
+
   return result;
 };
 
@@ -215,7 +252,8 @@ const sanitizeRequest = (req) => {
   if (!req) return null;
   const obj = req.toObject ? req.toObject() : req;
   return {
-    id: obj._id?.toString(),
+    _id: obj._id?.toString(),       // Phase 3.1.4: canonical Mongo ObjectId
+    id: obj._id?.toString(),         // Backward compatibility
     senderId: obj.senderId?.toString(),
     receiverId: obj.receiverId?.toString(),
     status: obj.status,

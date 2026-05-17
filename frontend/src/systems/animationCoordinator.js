@@ -5,7 +5,8 @@
 
 export const animationCoordinator = {
   // Methods for choreographing UI updates will go here
-  playSequence: async (sequence) => {
-    // Placeholder
+  // eslint-disable-next-line no-unused-vars
+  playSequence: async (_sequence) => {
+    // Placeholder for Phase 4+ animation orchestration
   }
 };

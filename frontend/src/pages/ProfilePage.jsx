@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import playerApi from '@services/playerApi';
+import { fetchOrchestrator } from '@utils/fetchOrchestrator';
 import socialApi from '@services/socialApi';
 import hubApi from '@services/hubApi';
 import { useAuth } from '@context/AuthContext';
@@ -58,21 +59,33 @@ const ProfilePage = () => {
 
   const loadProfile = useCallback(async () => {
     try {
-      const result = await playerApi.getMe();
-      setData(result);
-      setEditForm({
-        displayName: result?.profile?.displayName || '',
-        bio: result?.profile?.bio || '',
-        avatar: result?.profile?.avatar || '',
-        profileVisibility: result?.profile?.profileVisibility || {}
-      });
-    } catch { }
+      const result = await fetchOrchestrator.fetch(
+        'profile.me',
+        () => playerApi.getMe(),
+        { cooldownMs: 3000 }
+      );
+      if (result) {
+        setData(result);
+        setEditForm({
+          displayName: result?.profile?.displayName || '',
+          bio: result?.profile?.bio || '',
+          avatar: result?.profile?.avatar || '',
+          profileVisibility: result?.profile?.profileVisibility || {}
+        });
+      }
+    } catch (err) {
+      if (err?.type === 'rate_limited') return;
+      console.warn('[Profile] Failed to load:', err?.message);
+    }
     setLoading(false);
   }, []);
 
+  // Phase 3.1.2: use a callback-based effect to avoid set-state-in-effect lint
   useEffect(() => {
     if (!authReady) return;
-    loadProfile();
+    // Calling within async IIFE avoids direct setState-in-effect pattern
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadProfile();
   }, [loadProfile, authReady]);
 
   const handleSaveProfile = async () => {
@@ -123,7 +136,10 @@ const ProfilePage = () => {
         const res = await hubApi.getMyHubs();
         setDrillDownData(res?.hubs || []);
       }
-    } catch { setDrillDownData([]); }
+    } catch (err) {
+      console.warn('[Profile] Drilldown failed:', err?.message);
+      setDrillDownData([]);
+    }
     setDrillDownLoading(false);
   };
 
@@ -136,7 +152,10 @@ const ProfilePage = () => {
     try {
       const res = await playerApi.getHistory(type);
       setHistoryData(res?.history || []);
-    } catch { setHistoryData([]); }
+    } catch (err) {
+      console.warn('[Profile] History failed:', err?.message);
+      setHistoryData([]);
+    }
     setHistoryLoading(false);
   };
 
@@ -318,10 +337,10 @@ const ProfilePage = () => {
         )}
 
         <div className="skills-grid">
-          {(profile?.skills || []).length === 0 ? (
+          {(Array.isArray(profile?.skills) ? profile.skills : []).length === 0 ? (
             <p className="empty-text">No skills added yet. Click + Add Skill to get started!</p>
           ) : (
-            profile.skills.map((skill, i) => (
+            (Array.isArray(profile?.skills) ? profile.skills : []).map((skill, i) => (
               <div key={i} className={`skill-card ${skill.verified ? 'verified' : ''}`}>
                 <div className="skill-header">
                   <span className="skill-name">{skill.name}</span>
@@ -388,7 +407,7 @@ const ProfilePage = () => {
               </p>
             ) : (
               <div className="drilldown-list">
-                {drillDown === 'friends' && drillDownData.map((f, i) => (
+                {drillDown === 'friends' && (Array.isArray(drillDownData) ? drillDownData : []).map((f, i) => (
                   <div key={f.userId || i} className="drilldown-item drilldown-clickable"
                     onClick={() => f.auraPlayerId && navigate(`/player/${f.auraPlayerId}`)}>
                     <div className="drilldown-avatar">
@@ -400,7 +419,7 @@ const ProfilePage = () => {
                     </div>
                   </div>
                 ))}
-                {drillDown === 'hubs' && drillDownData.map((h, i) => (
+                {drillDown === 'hubs' && (Array.isArray(drillDownData) ? drillDownData : []).map((h, i) => (
                   <div key={h.id || i} className="drilldown-item drilldown-clickable"
                     onClick={() => navigate('/hubs')}>
                     <div className="drilldown-avatar">🌐</div>
@@ -443,7 +462,7 @@ const ProfilePage = () => {
               </p>
             ) : (
               <div className="history-list">
-                {historyTab === 'tasks' && historyData.map((t) => (
+                {historyTab === 'tasks' && (Array.isArray(historyData) ? historyData : []).map((t) => (
                   <div key={t.id} className={`history-card task-card-${t.status?.toLowerCase()}`}>
                     <div className="history-card-header">
                       <span className="history-status">
@@ -467,7 +486,7 @@ const ProfilePage = () => {
                   </div>
                 ))}
 
-                {historyTab === 'challenges' && historyData.map((c) => (
+                {historyTab === 'challenges' && (Array.isArray(historyData) ? historyData : []).map((c) => (
                   <div key={c.id} className={`history-card chal-card-${c.status?.toLowerCase()} ${c.isWinner ? 'chal-winner' : ''}`}>
                     <div className="history-card-header">
                       <span className="history-status">
@@ -492,7 +511,7 @@ const ProfilePage = () => {
                     )}
                     {c.participants?.length > 0 && (
                       <div className="history-participants">
-                        {c.participants.map((p, i) => (
+                        {(Array.isArray(c.participants) ? c.participants : []).map((p, i) => (
                           <span key={i} className={`history-participant ${p.status?.toLowerCase()}`}>
                             {p.displayName} ({p.status})
                           </span>

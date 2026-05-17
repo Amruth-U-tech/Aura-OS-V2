@@ -2,6 +2,8 @@ const ChallengeSubmission = require('../../models/ChallengeSubmission');
 const Challenge = require('../../models/Challenge');
 const trustService = require('../domains/trustDomainService');
 const playerProfileService = require('../domains/playerProfileDomainService');
+const auraEvents = require('../../events/eventBus');
+const { EVENTS } = require('../../events/eventConstants');
 
 // ======================================================
 // AI VALIDATION ORCHESTRATOR — Phase 2.4.2
@@ -36,6 +38,15 @@ const validateSubmission = async (submissionId) => {
     // No API key — use mock validation
     const result = await mockValidation(submission);
     await updateTrustAfterValidation(submission.userId, result.validScore);
+    // Phase 3.1.5: Emit for realtime propagation (mock path)
+    auraEvents.emitEvent(EVENTS.CHALLENGE_VALIDATED, {
+      userId: submission.userId.toString(),
+      challengeId: challenge._id.toString(),
+      auraChallengeId: challenge.auraChallengeId,
+      submissionId: submission._id.toString(),
+      validationScore: result.validScore,
+      validationStatus: submission.status,
+    });
     return result;
   }
 
@@ -72,6 +83,15 @@ const validateSubmission = async (submissionId) => {
         console.warn('[AIValidation] Quota exceeded, using mock validation');
         const result = await mockValidation(submission);
         await updateTrustAfterValidation(submission.userId, result.validScore);
+        // Phase 3.1.5: Emit for realtime propagation (quota fallback)
+        auraEvents.emitEvent(EVENTS.CHALLENGE_VALIDATED, {
+          userId: submission.userId.toString(),
+          challengeId: challenge._id.toString(),
+          auraChallengeId: challenge.auraChallengeId,
+          submissionId: submission._id.toString(),
+          validationScore: result.validScore,
+          validationStatus: submission.status,
+        });
         return result;
       }
       throw new Error(errBody.error?.message || `Gemini API error: ${response.status}`);
@@ -95,6 +115,16 @@ const validateSubmission = async (submissionId) => {
     // ── IMMEDIATE trust update after validation ──────
     await updateTrustAfterValidation(submission.userId, result.validScore);
 
+    // Phase 3.1.5: Emit domain event for realtime propagation
+    auraEvents.emitEvent(EVENTS.CHALLENGE_VALIDATED, {
+      userId: submission.userId.toString(),
+      challengeId: challenge._id.toString(),
+      auraChallengeId: challenge.auraChallengeId,
+      submissionId: submission._id.toString(),
+      validationScore: result.validScore,
+      validationStatus: submission.status,
+    });
+
     return {
       validScore: result.validScore,
       confidence: result.confidence,
@@ -113,6 +143,15 @@ const validateSubmission = async (submissionId) => {
     // Fallback to mock on any error
     const result = await mockValidation(submission);
     await updateTrustAfterValidation(submission.userId, result.validScore);
+    // Phase 3.1.5: Emit for realtime propagation (error fallback)
+    auraEvents.emitEvent(EVENTS.CHALLENGE_VALIDATED, {
+      userId: submission.userId.toString(),
+      challengeId: challenge._id.toString(),
+      auraChallengeId: challenge.auraChallengeId,
+      submissionId: submission._id.toString(),
+      validationScore: result.validScore,
+      validationStatus: submission.status,
+    });
     return result;
   }
 };

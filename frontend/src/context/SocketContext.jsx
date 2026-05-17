@@ -1,13 +1,19 @@
-import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import socketClient from '@services/socketClient';
 import { useAuth } from '@context/AuthContext';
+import { eventBus } from '@systems/eventBus';
+import { reconnectCoordinator } from '@systems/reconnectCoordinator';
 
 // ======================================================
-// SOCKET CONTEXT — Phase 3.0.1 (Hardened)
+// SOCKET CONTEXT — Phase 3.1.3 (Reconnect Coordinator)
 // Owns: socket connection lifecycle tied to auth state
-// Auto-connects when authenticated, disconnects on logout
-// Phase 3.0.1: reconnect event handling, token refresh sync,
-//              deterministic cleanup, backend restart recovery
+//
+// Phase 3.1.3:
+//   - Reconnect recovery delegated to reconnectCoordinator
+//   - Event buffering during hydration (prevents stale overwrites)
+//   - Individual context socket:reconnected listeners REMOVED
+//   - Reconnect cooldown prevents cascade bursts
+//
 // Exposes: connection status, room helpers, event listeners
 // Must NOT: contain business logic or mutate app data
 // ======================================================
@@ -21,19 +27,43 @@ const SocketContext = createContext({
   queryPresence: async () => ({}),
 });
 
+// Events that should be buffered during hydration
+const BUFFERABLE_EVENTS = new Set([
+  'player.xp.updated',
+  'player.trust.updated',
+  'player.level.up',
+  'player.streak.updated',
+  'player.notification',
+  'player.friend.request',
+  'player.challenge.invite',
+  'player.task.created',
+  'player.voucher.unlocked',
+  'hub.activity.created',
+  'hub.member.joined',
+  'hub.member.left',
+  'hub.challenge.created',
+  'hub.announcement',
+  'challenge.updated',
+  'challenge.submission.created',
+  'challenge.resolved',
+  'challenge.countdown',
+]);
+
 export const SocketProvider = ({ children }) => {
   const { token, isAuthenticated, authReady } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const cleanupRef = useRef([]);
   const prevTokenRef = useRef(null);
+  // Reconnect cooldown — prevent cascade bursts
+  const reconnectCooldownRef = useRef(0);
+  const RECONNECT_COOLDOWN_MS = 5000;
 
   // ── Connect/Disconnect based on auth state ────────
   useEffect(() => {
     if (!authReady) return;
 
     if (isAuthenticated && token) {
-      // Phase 3.0.1: If token changed but still authenticated,
-      // update the socket auth without full teardown
+      // If token changed but still authenticated, update socket auth
       if (prevTokenRef.current && prevTokenRef.current !== token) {
         socketClient.updateToken(token);
       }
@@ -43,35 +73,70 @@ export const SocketProvider = ({ children }) => {
       socketClient.connect(token);
 
       // Bridge core connection events to local state
-      const cleanup1 = socketClient.on('connect', () => setIsConnected(true));
+      const cleanup1 = socketClient.on('connect', () => {
+        const wasConnected = isConnected;
+        setIsConnected(true);
+
+        // Phase 3.1.3: On reconnect, delegate to ReconnectCoordinator
+        // instead of emitting socket:reconnected for individual contexts
+        if (wasConnected === false && prevTokenRef.current) {
+          const now = Date.now();
+          if (now - reconnectCooldownRef.current > RECONNECT_COOLDOWN_MS) {
+            reconnectCooldownRef.current = now;
+            // Centralized reconnect — coordinator handles staged hydration
+            reconnectCoordinator.handleReconnect();
+          }
+        }
+      });
       const cleanup2 = socketClient.on('disconnect', () => setIsConnected(false));
 
-      // Phase 3.0.1: Listen for server-side reconnect confirmation
+      // Transport-level reconnect (server-confirmed)
       const cleanup3 = socketClient.on('transport:reconnected', (data) => {
-        console.info(`[SocketContext] Transport reconnected: ${data.restoredRooms} rooms restored for ${data.auraPlayerId}`);
+        console.info(`[SocketContext] Transport reconnected: ${data?.restoredRooms || 0} rooms restored`);
         setIsConnected(true);
+        const now = Date.now();
+        if (now - reconnectCooldownRef.current > RECONNECT_COOLDOWN_MS) {
+          reconnectCooldownRef.current = now;
+          reconnectCoordinator.handleReconnect();
+        }
       });
 
       // Bridge realtime events to the global eventBus
-      // Components can subscribe via eventBus.on('player.xp.updated', cb)
+      // Phase 3.1.3: Events are buffered during hydration to prevent
+      // stale overwrites. The buffer is flushed after hydration completes.
+      const makeBridge = (eventName) => {
+        return socketClient.on(eventName, (data) => {
+          // If coordinator is hydrating and this is a bufferable event,
+          // buffer it instead of emitting immediately
+          if (BUFFERABLE_EVENTS.has(eventName) && reconnectCoordinator.isBuffering()) {
+            reconnectCoordinator.bufferEvent(eventName, data);
+            return;
+          }
+          eventBus.emit(eventName, data);
+        });
+      };
+
       const bridges = [
-        socketClient.bridgeToEventBus('player.xp.updated'),
-        socketClient.bridgeToEventBus('player.trust.updated'),
-        socketClient.bridgeToEventBus('player.level.up'),
-        socketClient.bridgeToEventBus('player.streak.updated'),
-        socketClient.bridgeToEventBus('player.notification'),
-        socketClient.bridgeToEventBus('player.friend.request'),
-        socketClient.bridgeToEventBus('player.challenge.invite'),
-        socketClient.bridgeToEventBus('player.voucher.unlocked'),
-        socketClient.bridgeToEventBus('hub.activity.created'),
-        socketClient.bridgeToEventBus('hub.member.joined'),
-        socketClient.bridgeToEventBus('hub.member.left'),
-        socketClient.bridgeToEventBus('hub.challenge.created'),
-        socketClient.bridgeToEventBus('hub.announcement'),
-        socketClient.bridgeToEventBus('challenge.updated'),
-        socketClient.bridgeToEventBus('challenge.submission.created'),
-        socketClient.bridgeToEventBus('challenge.resolved'),
-        socketClient.bridgeToEventBus('challenge.countdown'),
+        makeBridge('player.xp.updated'),
+        makeBridge('player.trust.updated'),
+        makeBridge('player.level.up'),
+        makeBridge('player.streak.updated'),
+        makeBridge('player.notification'),
+        makeBridge('player.friend.request'),
+        makeBridge('player.challenge.invite'),
+        makeBridge('player.task.created'),
+        makeBridge('player.voucher.unlocked'),
+        makeBridge('hub.activity.created'),
+        makeBridge('hub.member.joined'),
+        makeBridge('hub.member.left'),
+        makeBridge('hub.challenge.created'),
+        makeBridge('hub.announcement'),
+        makeBridge('challenge.updated'),
+        makeBridge('challenge.submission.created'),
+        makeBridge('challenge.resolved'),
+        makeBridge('challenge.validated'),    // Phase 3.1.5
+        makeBridge('challenge.cancelled'),    // Phase 3.1.5
+        makeBridge('challenge.countdown'),
       ];
 
       cleanupRef.current = [cleanup1, cleanup2, cleanup3, ...bridges];
@@ -83,11 +148,13 @@ export const SocketProvider = ({ children }) => {
         setIsConnected(false);
       };
     } else {
-      // Not authenticated — ensure disconnected
+      // Not authenticated — sync React state with external socket system
       socketClient.disconnect();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsConnected(false);
       prevTokenRef.current = null;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, token, authReady]);
 
   // ── Exposed methods (stable refs) ─────────────────
@@ -125,4 +192,5 @@ export const SocketProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useSocket = () => useContext(SocketContext);

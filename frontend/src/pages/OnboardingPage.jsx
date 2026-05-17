@@ -1,4 +1,3 @@
-import React from 'react';
 import { useOnboardingFlow } from '@hooks/useOnboardingFlow';
 import IntroCarousel from '@components/onboarding/IntroCarousel';
 import PlayerProfileForm from '@components/onboarding/PlayerProfileForm';

@@ -24,7 +24,6 @@ const MAX_RECONNECT_ATTEMPTS = 15;
 let _socket = null;
 let _heartbeatTimer = null;
 let _subscribedRooms = new Set();
-let _isInitialized = false;
 let _currentToken = null; // Track token for reconnect auth refresh
 
 // ── Prevent duplicate listeners ───────────────────────
@@ -111,7 +110,6 @@ const connect = (token) => {
     eventBus.emit('socket:reconnected', data);
   });
 
-  _isInitialized = true;
   return _socket;
 };
 
@@ -144,8 +142,6 @@ const _fullCleanup = () => {
     _socket.disconnect();
     _socket = null;
   }
-
-  _isInitialized = false;
 };
 
 // ── Heartbeat ─────────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext } from 'react';
+import { createContext, useState, useContext } from 'react';
 
 const OverlayContext = createContext();
 
@@ -25,4 +25,5 @@ export const OverlayProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useOverlay = () => useContext(OverlayContext);

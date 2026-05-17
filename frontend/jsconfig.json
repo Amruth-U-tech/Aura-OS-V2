@@ -1,5 +1,10 @@
 {
   "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
@@ -10,7 +15,10 @@
       "@context/*": ["src/context/*"],
       "@utils/*": ["src/utils/*"],
       "@styles/*": ["src/styles/*"]
-    }
+    },
+    "allowImportingTsExtensions": false,
+    "noEmit": true,
+    "skipLibCheck": true
   },
-  "include": ["src"]
+  "include": ["src", "tests"]
 }

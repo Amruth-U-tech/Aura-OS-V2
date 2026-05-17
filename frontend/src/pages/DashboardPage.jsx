@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTasks } from '@hooks/useTasks';
 import { useMissionFilters } from '@hooks/useMissionFilters';
 import { useBackendStatus } from '@hooks/useBackendStatus';
@@ -20,7 +20,7 @@ const DashboardPage = () => {
   } = useMissionFilters();
 
   const {
-    missions, loading, error,
+    missions, loading,
     createMission, completeMission, cancelMission, failMission
   } = useTasks(activeFilters);
 

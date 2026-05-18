@@ -39,8 +39,11 @@ const register = () => {
     if (!auraId) return;
     socketEmitter.emitToPlayer(auraId, 'player.task.created', {
       type: 'TASK_CREATED',
+      taskId: data.taskId || data._id || null,
       title: data.title,
       priority: data.priority,
+      status: data.status || 'PENDING',
+      deadline: data.deadline || null,
       missionType: data.missionType,
       timestamp: Date.now()
     });
@@ -51,9 +54,13 @@ const register = () => {
     const auraId = await _resolveAuraPlayerId(data.userId);
     if (!auraId) return;
     socketEmitter.playerXpUpdated(auraId, {
-      xp: data.xp,
-      delta: data.delta,
+      // Phase 3.1.6 FIX: Send field names that frontend PlayerContext expects
+      // xpListener emits { amount, balanceAfter, level } — forward them as-is
+      amount: data.amount || data.delta || 0,
+      balanceAfter: typeof data.balanceAfter === 'number' ? data.balanceAfter : data.xp,
+      level: data.level,
       source: data.source,
+      type: data.type,
       timestamp: Date.now()
     });
   });
@@ -113,6 +120,40 @@ const register = () => {
         type: 'FRIEND_ACCEPTED',
         friendId: data.senderId,
         friendName: data.senderName,
+        timestamp: Date.now()
+      });
+    }
+  });
+
+  // Phase 3.1.6 FIX: FRIEND_DECLINED socket listener — ROOT CAUSE of decline flash card not vanishing
+  // Previously this event was emitted by socialDomainService but had NO socket transport.
+  // Both the decliner (receiver) and the sender must be notified.
+  auraEvents.registerListener(EVENTS.FRIEND_DECLINED, 'socket:friend.declined', async (data) => {
+    // Resolve receiver's name for sender notification (same pattern as FRIEND_REQUEST_SENT)
+    const receiverProfile = await PlayerProfile.findOne({ userId: data.receiverId })
+      .select('displayName auraPlayerId')
+      .lean();
+
+    // Notify the SENDER — their request was declined
+    // This shows up in sent requests section
+    const senderAuraId = await _resolveAuraPlayerId(data.senderId);
+    if (senderAuraId) {
+      socketEmitter.playerNotification(senderAuraId, {
+        type: 'FRIEND_DECLINED',
+        requestId: data.requestId,
+        friendId: data.receiverId,
+        friendName: receiverProfile?.displayName || 'Player',
+        timestamp: Date.now()
+      });
+    }
+
+    // Notify the RECEIVER (decliner) — so their UI removes the flash card
+    const receiverAuraId = receiverProfile?.auraPlayerId || await _resolveAuraPlayerId(data.receiverId);
+    if (receiverAuraId) {
+      socketEmitter.playerFriendRequest(receiverAuraId, {
+        type: 'REQUEST_DECLINED',
+        requestId: data.requestId,
+        senderId: data.senderId,
         timestamp: Date.now()
       });
     }

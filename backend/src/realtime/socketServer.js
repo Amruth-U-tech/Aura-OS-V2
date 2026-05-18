@@ -14,10 +14,11 @@ const socketEmitter = require('./socketEmitter');
 // Must NOT: contain business logic, mutate DB, calculate XP
 // ======================================================
 
-// ── Configuration ─────────────────────────────────────
-const HEARTBEAT_INTERVAL_MS = 30000;    // Socket.IO native ping every 30s
-const HEARTBEAT_TIMEOUT_MS = 60000;     // Stale after 60s silence
-const STALE_SWEEP_INTERVAL_MS = 45000;  // Sweep for stale sockets every 45s
+// Phase 3.1.6 FIX: Relaxed timing to survive browser tab throttling.
+// Chrome throttles background tab timers to 1/min. Previous 30s/60s caused false ping timeouts.
+const HEARTBEAT_INTERVAL_MS = 45000;    // Socket.IO native ping every 45s
+const HEARTBEAT_TIMEOUT_MS = 120000;    // Stale after 120s silence (survives background throttle)
+const STALE_SWEEP_INTERVAL_MS = 90000;  // Sweep for stale sockets every 90s
 
 let _heartbeatSweeper = null;
 

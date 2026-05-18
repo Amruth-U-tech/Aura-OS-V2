@@ -29,7 +29,7 @@ const setDisciplineEnabled = async (userId, enabled) => {
   const profile = await DisciplineProfile.findOneAndUpdate(
     { userId },
     update,
-    { new: true }
+    { returnDocument: 'after' }
   );
 
   if (!profile) {
@@ -49,7 +49,7 @@ const completeDisciplineSession = async (userId) => {
       currentState: DISCIPLINE_STATE.COMPLETED,
       lastCompletedDate: new Date()
     },
-    { new: true }
+    { returnDocument: 'after' }
   );
 
   if (!profile) {

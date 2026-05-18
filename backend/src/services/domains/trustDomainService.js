@@ -58,7 +58,7 @@ const updateTrustScore = async (userId, scoreData) => {
   return TrustProfile.findOneAndUpdate(
     { userId },
     { $set: sanitized },
-    { new: true, runValidators: true, upsert: true }
+    { returnDocument: 'after', runValidators: true, upsert: true }
   );
 };
 

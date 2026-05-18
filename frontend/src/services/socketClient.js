@@ -17,7 +17,8 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL
   || import.meta.env.VITE_API_URL?.replace('/api', '')
   || 'http://localhost:5000';
 
-const HEARTBEAT_INTERVAL_MS = 25000; // Client sends heartbeat every 25s
+// Phase 3.1.6 FIX: Aligned with server's relaxed pingInterval (45s)
+const HEARTBEAT_INTERVAL_MS = 40000; // Client sends heartbeat every 40s (under server's 45s ping)
 const MAX_RECONNECT_ATTEMPTS = 15;
 
 // ── State ─────────────────────────────────────────────

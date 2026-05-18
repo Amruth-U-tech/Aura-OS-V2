@@ -163,7 +163,13 @@ export const ChallengeProvider = ({ children }) => {
         if (eventDedup.isDuplicate('challenge.resolved', data)) return;
         const id = data?._id || data?.challengeId;
         if (id) {
-          dispatch({ type: 'UPDATE_CHALLENGE', payload: { _id: id, status: 'COMPLETED', winnerId: data.winnerId } });
+          // Phase 3.1.6 FIX: Include winnerName — previously dropped, causing loser to see raw ObjectId
+          dispatch({ type: 'UPDATE_CHALLENGE', payload: {
+            _id: id,
+            status: 'COMPLETED',
+            winnerId: data.winnerId,
+            winnerName: data.winnerName || null,
+          }});
         }
       },
 

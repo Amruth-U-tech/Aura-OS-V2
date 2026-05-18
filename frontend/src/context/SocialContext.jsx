@@ -45,6 +45,18 @@ const socialReducer = (state, action) => {
       return { ...state, incomingRequests: [action.payload, ...state.incomingRequests] };
     }
 
+    // Phase 3.1.6 FIX: Remove a specific incoming request by ID (decline/accept)
+    case 'REMOVE_INCOMING_REQUEST': {
+      const reqId = action.payload?.toString?.() || action.payload;
+      if (!reqId) return state;
+      return {
+        ...state,
+        incomingRequests: state.incomingRequests.filter(r =>
+          (r._id?.toString?.() || r._id) !== reqId
+        )
+      };
+    }
+
     case 'ADD_FRIEND': {
       const friends = safeAppend(state.friends, action.payload, 'friendId');
       return { ...state, friends };
@@ -150,8 +162,11 @@ export const SocialProvider = ({ children }) => {
 
     const handlers = {
       'player.friend.request': (data) => {
-        if (eventDedup.isDuplicate('player.friend.request', data)) return;
-        if (data?.type === 'INCOMING_REQUEST') {
+        if (!data?.type) return;
+
+        // Handle incoming friend request
+        if (data.type === 'INCOMING_REQUEST') {
+          if (eventDedup.isDuplicate('player.friend.request', data)) return;
           // Phase 3.1.4: CRITICAL — only add to state if we have a REAL Mongo requestId.
           // Temp IDs (rt-*) are ARCHITECTURALLY ILLEGAL in canonical state.
           if (data.requestId && !String(data.requestId).startsWith('rt-')) {
@@ -173,7 +188,14 @@ export const SocialProvider = ({ children }) => {
             fetchIncoming({ force: true, cooldownMs: 0 });
           }
         }
+
+        // Phase 3.1.6 FIX: Decliner receives confirmation — remove the flash card immediately
+        if (data.type === 'REQUEST_DECLINED' && data.requestId) {
+          if (eventDedup.isDuplicate('request.declined.receiver', data)) return;
+          dispatch({ type: 'REMOVE_INCOMING_REQUEST', payload: data.requestId });
+        }
       },
+
       'player.notification': (data) => {
         if (data?.type === 'FRIEND_ACCEPTED') {
           if (eventDedup.isDuplicate('friend.accepted', data)) return;
@@ -190,6 +212,12 @@ export const SocialProvider = ({ children }) => {
           });
           // Refresh to get clean DB truth
           fetchFriends({ cooldownMs: 0, force: true });
+          fetchSent({ cooldownMs: 0, force: true });
+        }
+
+        // Phase 3.1.6 FIX: Sender sees decline notification — refresh sent requests
+        if (data?.type === 'FRIEND_DECLINED') {
+          if (eventDedup.isDuplicate('friend.declined.sender', data)) return;
           fetchSent({ cooldownMs: 0, force: true });
         }
       },

@@ -90,7 +90,7 @@ const updateProfile = async (userId, updateData) => {
   return PlayerProfile.findOneAndUpdate(
     { userId },
     { $set: sanitized },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
 };
 
@@ -112,7 +112,7 @@ const updateProgression = async (userId, progressionData) => {
   return PlayerProfile.findOneAndUpdate(
     { userId },
     { $set: sanitized },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
 };
 
@@ -131,7 +131,7 @@ const incrementCounter = async (userId, field, amount = 1) => {
   return PlayerProfile.findOneAndUpdate(
     { userId },
     { $inc: { [field]: amount } },
-    { new: true }
+    { returnDocument: 'after' }
   );
 };
 

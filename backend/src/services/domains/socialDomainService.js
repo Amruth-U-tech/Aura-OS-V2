@@ -70,7 +70,7 @@ const acceptFriendRequest = async (requestId, receiverId) => {
     const existing = await Friendship.findOneAndUpdate(
       { userA: a, userB: b },
       { $set: { isActive: true, establishedAt: new Date() } },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
     if (!existing) {
       await Friendship.create({ userA: a, userB: b });
@@ -131,7 +131,7 @@ const removeFriendship = async (userIdA, userIdB) => {
   const result = await Friendship.findOneAndUpdate(
     { userA: a, userB: b, isActive: true },
     { $set: { isActive: false } },
-    { new: true }
+    { returnDocument: 'after' }
   );
 
   if (!result) throw Object.assign(new Error('Friendship not found'), { statusCode: 404 });

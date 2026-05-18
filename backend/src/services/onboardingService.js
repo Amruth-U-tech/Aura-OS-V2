@@ -46,7 +46,7 @@ const savePlayerProfile = async (userId, profileData) => {
       height, weight, primaryGoal,
       onboardingStep: ONBOARDING_STEPS.DISCIPLINE_SETUP
     },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
 
   if (!user) {
@@ -63,7 +63,7 @@ const saveDisciplinePreference = async (userId, disciplineHour) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { defaultDisciplineTime: disciplineHour },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
 
   if (!user) {
@@ -80,7 +80,7 @@ const saveDisciplinePreference = async (userId, disciplineHour) => {
       scheduledHour: disciplineHour,
       currentState: DISCIPLINE_STATE.WAITING
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: 'after' }
   );
 
   return user;
@@ -94,7 +94,7 @@ const completeOnboarding = async (userId) => {
       onboardingCompleted: true,
       onboardingStep: ONBOARDING_STEPS.COMPLETE
     },
-    { new: true }
+    { returnDocument: 'after' }
   );
 
   if (!user) {

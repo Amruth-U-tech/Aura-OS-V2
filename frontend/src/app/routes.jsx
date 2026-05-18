@@ -9,6 +9,7 @@ import FocusPage from '@/pages/FocusPage';
 import DisciplinePage from '@/pages/DisciplinePage';
 import ProfilePage from '@/pages/ProfilePage';
 import AuthPage from '@/pages/AuthPage';
+import DiscordCallbackPage from '@/pages/DiscordCallbackPage'; // Phase D1
 import OnboardingPage from '@/pages/OnboardingPage';
 
 // Phase 2.2 Pages
@@ -35,6 +36,7 @@ const AppRoutes = () => {
     <Routes>
       {/* ── Public Routes ───────────────────────────── */}
       <Route path={ROUTES.AUTH} element={<AuthPage />} />
+      <Route path={ROUTES.DISCORD_CALLBACK} element={<DiscordCallbackPage />} />
 
       {/* ── Redirect /login → /auth ──────────────────── */}
       <Route path={ROUTES.LOGIN} element={<Navigate to={ROUTES.AUTH} replace />} />

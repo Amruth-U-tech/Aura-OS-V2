@@ -40,7 +40,9 @@ const userSchema = new mongoose.Schema(
     },
     passwordHash: {
       type: String,
-      required: true,
+      // Phase D1: Not required — Discord auth users have no password
+      // Local auth enforces password at service level
+      required: false,
       select: false // Never return password in queries
     },
 

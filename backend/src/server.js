@@ -18,6 +18,7 @@ const healthRoutes = require('./routes/healthRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const progressionRoutes = require('./routes/progressionRoutes');
 const authRoutes = require('./routes/authRoutes');
+const discordAuthRoutes = require('./routes/discordAuthRoutes'); // Phase D1
 const profileRoutes = require('./routes/profileRoutes');
 const disciplineRoutes = require('./routes/disciplineRoutes');
 const integrationRoutes = require('./routes/integrationRoutes');
@@ -57,11 +58,13 @@ connectDB();
 // Middleware Pipeline
 app.use(helmet());
 app.use(cors({
-  origin: '*', // Adjust for prod
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true  // Phase D1.DEBUG: Allow cookies for OAuth state validation
 }));
 app.use(express.json({ limit: '1mb' }));
+app.use(require('cookie-parser')());  // Phase D1: Required for OAuth state cookies
 app.use(morgan);
 app.use(apiLimiter);
 
@@ -70,6 +73,7 @@ app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1/progression', progressionRoutes);
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/auth', discordAuthRoutes);  // Phase D1: Discord OAuth routes
 app.use('/api/v1/profile', profileRoutes);
 app.use('/api/v1/discipline', disciplineRoutes);
 app.use('/api/v1/integrations', integrationRoutes);
@@ -114,6 +118,10 @@ httpServer.listen(PORT, () => {
 
 // Phase 3.1: Initialize event orchestration AFTER Socket.IO is ready
 initializeEventSystem();
+
+// Phase D2: Start proactive Discord token health monitor
+const { startHealthMonitor } = require('./services/sessionHealthService');
+startHealthMonitor();
 
 // Handle unhandled rejections globally to prevent silent crashes
 process.on('unhandledRejection', (err) => {

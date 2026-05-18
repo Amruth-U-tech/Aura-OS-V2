@@ -23,7 +23,9 @@ export const ROUTES = {
   FRIENDS: '/friends',
   // Phase 2.4.2
   PLAYER_PROFILE: '/player/:auraPlayerId',
-  VOUCHERS: '/vouchers'
+  VOUCHERS: '/vouchers',
+  // Phase D1 — Discord OAuth
+  DISCORD_CALLBACK: '/auth/discord/callback'
 };
 
 export const API_ENDPOINTS = {

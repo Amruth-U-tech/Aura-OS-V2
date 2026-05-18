@@ -25,8 +25,9 @@ let _heartbeatSweeper = null;
 const initializeSocketServer = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
-      origin: '*', // Match server.js CORS config
-      methods: ['GET', 'POST']
+      origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+      methods: ['GET', 'POST'],
+      credentials: true
     },
     pingInterval: HEARTBEAT_INTERVAL_MS,
     pingTimeout: HEARTBEAT_TIMEOUT_MS,

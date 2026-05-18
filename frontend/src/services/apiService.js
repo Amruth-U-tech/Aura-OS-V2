@@ -15,6 +15,7 @@ const baseURL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/
 const apiService = axios.create({
   baseURL,
   timeout: 10000,
+  withCredentials: true,  // Phase D1.DEBUG: Send cookies for OAuth state validation
   headers: {
     'Content-Type': 'application/json'
   }

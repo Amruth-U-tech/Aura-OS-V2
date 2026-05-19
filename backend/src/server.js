@@ -31,6 +31,10 @@ const playerRoutes = require('./routes/playerRoutes');
 const discoveryRoutes = require('./routes/discoveryRoutes');
 // Phase 2.4.2 — Voucher Routes
 const voucherRoutes = require('./routes/voucherRoutes');
+// Phase N1 — Notification Routes
+const notificationRoutes = require('./routes/notificationRoutes');
+// Phase N2 — Metrics/Observability
+const { getSystemMetrics } = require('./metrics');
 // Phase 3.0 — Realtime Transport Foundation
 const { initializeSocketServer } = require('./realtime');
 // Phase 3.1 — Event Orchestration System
@@ -86,6 +90,13 @@ app.use('/api/v1/player', playerRoutes);
 app.use('/api/v1/discover', discoveryRoutes);
 // Phase 2.4.2 — Voucher Routes
 app.use('/api/v1/vouchers', voucherRoutes);
+// Phase N1 — Notification Routes
+app.use('/api/v1/notifications', notificationRoutes);
+// Phase N2 — Observability Endpoint
+const { protect } = require('./middleware/authMiddleware');
+app.get('/api/v1/metrics', protect, (req, res) => {
+  res.json({ status: 'success', data: getSystemMetrics() });
+});
 
 // ── Lifecycle Schedulers ──────────────────────────────
 startScheduler();

@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@context/AuthContext';
 import { ROUTES } from '@utils/constants';
+import NotificationBell from '@components/notifications/NotificationBell';
 import './Sidebar.css';
 
 // ======================================================
@@ -32,15 +33,18 @@ const Sidebar = () => {
   return (
     <aside className="sidebar">
       {/* ── Player Identity — Phase 2.4.3: Click to open own profile */}
-      <div className="sidebar-header" onClick={() => navigate(ROUTES.PROFILE)}
-        style={{ cursor: 'pointer' }} title="View your profile">
-        <div className="avatar">
-          {user?.playerName?.charAt(0).toUpperCase() || 'U'}
+      <div className="sidebar-header">
+        <div className="sidebar-header-profile" onClick={() => navigate(ROUTES.PROFILE)}
+          style={{ cursor: 'pointer' }} title="View your profile">
+          <div className="avatar">
+            {user?.playerName?.charAt(0).toUpperCase() || 'U'}
+          </div>
+          <div className="user-info">
+            <span className="user-name">{user?.playerName || 'Player'}</span>
+            <span className="user-level">Lvl {user?.level || 1}</span>
+          </div>
         </div>
-        <div className="user-info">
-          <span className="user-name">{user?.playerName || 'Player'}</span>
-          <span className="user-level">Lvl {user?.level || 1}</span>
-        </div>
+        <NotificationBell />
       </div>
 
       {/* ── Navigation ─────────────────────────────── */}
@@ -73,6 +77,7 @@ const Sidebar = () => {
         <div className="nav-section">
           <span className="nav-section-label">Growth</span>
           {navItem(ROUTES.PROFILE, '👤', 'Profile')}
+          {navItem(ROUTES.NOTIFICATIONS, '🔔', 'Notifications')}
         </div>
       </nav>
 

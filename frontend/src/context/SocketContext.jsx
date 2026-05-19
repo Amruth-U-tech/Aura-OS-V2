@@ -52,6 +52,10 @@ const BUFFERABLE_EVENTS = new Set([
   'challenge.ready',        // Phase 3.1.7
   'challenge.activated',    // Phase 3.1.7.1: dedicated activation event
   'challenge.countdown',
+  'notification.created',   // Phase N1: persistent notification
+  'notification.read',       // Phase N1.1: cross-tab read sync
+  'notification.read-all',   // Phase N1.1: cross-tab mark-all-read
+  'notification.acknowledged', // Phase N1.1: cross-tab acknowledge sync
 ]);
 
 export const SocketProvider = ({ children }) => {
@@ -145,6 +149,10 @@ export const SocketProvider = ({ children }) => {
         makeBridge('challenge.ready'),        // Phase 3.1.7
         makeBridge('challenge.activated'),    // Phase 3.1.7.1
         makeBridge('challenge.countdown'),
+        makeBridge('notification.created'),   // Phase N1
+        makeBridge('notification.read'),       // Phase N1.1
+        makeBridge('notification.read-all'),   // Phase N1.1
+        makeBridge('notification.acknowledged'), // Phase N1.1
       ];
 
       cleanupRef.current = [cleanup1, cleanup2, cleanup3, ...bridges];

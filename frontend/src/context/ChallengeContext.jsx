@@ -102,12 +102,12 @@ export const ChallengeProvider = ({ children }) => {
     }
   }, []);
 
+  // Phase N1.1 FIX C: Reconnect hydration MUST be authoritative
+  // fetchOrchestrator.hydrate can skip due to cooldowns → on reconnect we MUST
+  // force a full replace to eliminate stale lifecycle entities (cancelled/declined/expired)
   const softHydrate = useCallback(async () => {
-    await fetchOrchestrator.hydrate(
-      'challenges',
-      () => fetchChallenges({ cooldownMs: 0 }),
-      { cooldownMs: 3000 }
-    );
+    console.info('[ChallengeContext] Reconnect hydration: authoritative refresh');
+    await fetchChallenges({ cooldownMs: 0, force: true });
   }, [fetchChallenges]);
 
   // ── Initial load ───────────────────────────────

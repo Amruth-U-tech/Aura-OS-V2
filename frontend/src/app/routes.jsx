@@ -24,6 +24,9 @@ import FriendsPage from '@/pages/FriendsPage';
 import PlayerProfilePage from '@/pages/PlayerProfilePage';
 import VouchersPage from '@/pages/VouchersPage';
 
+// Phase N1 — Notifications
+import NotificationsPage from '@/pages/NotificationsPage';
+
 // ======================================================
 // ROUTING DEFINITION — Phase 2.4.2
 // Protected routes gate ALL mission-system pages
@@ -64,6 +67,9 @@ const AppRoutes = () => {
         {/* Phase 2.4.2 — Public Profile & Vouchers */}
         <Route path={ROUTES.PLAYER_PROFILE} element={<PlayerProfilePage />} />
         <Route path={ROUTES.VOUCHERS} element={<VouchersPage />} />
+
+        {/* Phase N1 — Notifications */}
+        <Route path={ROUTES.NOTIFICATIONS} element={<NotificationsPage />} />
       </Route>
 
       {/* ── Catch-all → dashboard (will redirect to /auth if unauthed) ── */}

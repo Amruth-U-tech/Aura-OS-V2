@@ -5,6 +5,7 @@ const socketListener = require('./listeners/socketListener');
 const xpListener = require('./listeners/xpListener');
 const trustListener = require('./listeners/trustListener');
 const historyListener = require('./listeners/historyListener');
+const notificationListener = require('./listeners/notificationListener');
 
 // ======================================================
 // EVENT SYSTEM BOOTSTRAP — Phase 3.1
@@ -29,6 +30,7 @@ const initializeEventSystem = () => {
   trustListener.register();
   historyListener.register();
   socketListener.register();
+  notificationListener.register(); // Phase N1: notification persistence (runs LAST)
 
   const stats = auraEvents.getStats();
   console.log(`[EventBus] ✅ Event system ready (${stats.registeredEvents} events, ${stats.totalListeners} listeners)`);

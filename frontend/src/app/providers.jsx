@@ -10,6 +10,8 @@ import { PlayerProvider } from '@context/PlayerContext';
 import { SocialProvider } from '@context/SocialContext';
 import { ChallengeProvider } from '@context/ChallengeContext';
 import { HubProvider } from '@context/HubContext';
+// Phase N1 — Notification Context
+import { NotificationProvider } from '@context/NotificationContext';
 
 // ======================================================
 // PROVIDERS WRAPPER — Phase 3.1.1
@@ -29,11 +31,13 @@ const Providers = ({ children }) => {
               <ChallengeProvider>
                 <HubProvider>
                   <TaskProvider>
-                    <UserProvider>
-                      <OverlayProvider>
-                        {children}
-                      </OverlayProvider>
-                    </UserProvider>
+                    <NotificationProvider>
+                      <UserProvider>
+                        <OverlayProvider>
+                          {children}
+                        </OverlayProvider>
+                      </UserProvider>
+                    </NotificationProvider>
                   </TaskProvider>
                 </HubProvider>
               </ChallengeProvider>

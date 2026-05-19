@@ -53,6 +53,11 @@ const EVENTS = {
   // ── Reward Domain ─────────────────────────────────
   VOUCHER_UNLOCKED:    'voucher.unlocked',
   REWARD_GRANTED:      'reward.granted',
+
+  // ── Notification Domain — Phase N1 ────────────────
+  NOTIFICATION_CREATED:      'notification.created',
+  NOTIFICATION_READ:         'notification.read',
+  NOTIFICATION_ACKNOWLEDGED: 'notification.acknowledged',
 };
 
 module.exports = { EVENTS };

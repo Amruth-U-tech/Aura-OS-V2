@@ -159,6 +159,39 @@ const register = () => {
     }
   });
 
+  // Phase N1.1 FIX B: FRIEND_REMOVED socket listener
+  // ROOT CAUSE of friend removal UI not updating — event had NO socket transport
+  // Emits to BOTH players so SocialContext can invalidate friendship state
+  auraEvents.registerListener(EVENTS.FRIEND_REMOVED, 'socket:friend.removed', async (data) => {
+    const removerProfile = await PlayerProfile.findOne({ userId: data.removerId })
+      .select('displayName auraPlayerId')
+      .lean();
+    const removedProfile = await PlayerProfile.findOne({ userId: data.removedId })
+      .select('displayName auraPlayerId')
+      .lean();
+
+    // Notify the REMOVED player — their friend list must update
+    if (removedProfile?.auraPlayerId) {
+      socketEmitter.playerNotification(removedProfile.auraPlayerId, {
+        type: 'FRIEND_REMOVED',
+        actorId: data.removerId,
+        actorName: removerProfile?.displayName || 'Player',
+        removedId: data.removedId,
+        timestamp: Date.now()
+      });
+    }
+
+    // Notify the REMOVER — cross-tab sync for their own friend list
+    if (removerProfile?.auraPlayerId) {
+      socketEmitter.playerNotification(removerProfile.auraPlayerId, {
+        type: 'FRIEND_REMOVED_SELF',
+        removedId: data.removedId,
+        removedName: removedProfile?.displayName || 'Player',
+        timestamp: Date.now()
+      });
+    }
+  });
+
   // ── Challenge Events — Phase 3.1.6 DUAL EMIT ──────
   // All challenge events use emitToParticipants() which sends to
   // each participant's guaranteed player:AURA-PLR-XXX room.

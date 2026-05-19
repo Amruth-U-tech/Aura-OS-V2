@@ -25,7 +25,9 @@ export const ROUTES = {
   PLAYER_PROFILE: '/player/:auraPlayerId',
   VOUCHERS: '/vouchers',
   // Phase D1 — Discord OAuth
-  DISCORD_CALLBACK: '/auth/discord/callback'
+  DISCORD_CALLBACK: '/auth/discord/callback',
+  // Phase N1 — Notifications
+  NOTIFICATIONS: '/notifications'
 };
 
 export const API_ENDPOINTS = {
@@ -67,5 +69,8 @@ export const API_ENDPOINTS = {
   VOUCHERS_CURRENT: '/vouchers/current',
   VOUCHERS_HISTORY: '/vouchers/history',
   // Phase 2.4.2 — Hub Approval APIs
-  HUB_PENDING: '/hubs'
+  HUB_PENDING: '/hubs',
+  // Phase N1 — Notifications
+  NOTIFICATIONS: '/notifications',
+  NOTIFICATIONS_UNREAD: '/notifications/unread-count'
 };

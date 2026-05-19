@@ -23,8 +23,16 @@
   padding: 24px 20px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-header-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
 }
 
 .avatar {

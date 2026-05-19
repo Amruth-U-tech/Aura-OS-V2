@@ -77,6 +77,14 @@ router.delete('/friends/:userId', protect, asyncHandler(async (req, res) => {
     friendId: req.params.userId
   });
 
+  // Phase N1: Emit domain event for notification persistence + socket transport
+  const auraEvents = require('../events/eventBus');
+  const { EVENTS } = require('../events/eventConstants');
+  auraEvents.emitEvent(EVENTS.FRIEND_REMOVED, {
+    removerId: req.user.id.toString(),
+    removedId: req.params.userId.toString()
+  });
+
   sendSuccess(res, null, 'Friendship removed');
 }));
 

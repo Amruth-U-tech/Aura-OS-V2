@@ -126,13 +126,14 @@ export const SocialProvider = ({ children }) => {
     }
   }, []);
 
-  // ── Soft hydration via hydration lock ─────────────
+  // Phase N1.1 FIX: Reconnect hydration MUST be authoritative
+  // Cannot use fetchOrchestrator.hydrate (may skip due to cooldowns)
+  // Reconnect = distributed state recovery — must force-replace
   const softHydrate = useCallback(async () => {
-    await fetchOrchestrator.hydrate('social', async () => {
-      await fetchFriends({ cooldownMs: 0 });
-      await fetchIncoming({ cooldownMs: 0 });
-      await fetchSent({ cooldownMs: 0 });
-    }, { cooldownMs: 3000 });
+    console.info('[SocialContext] Reconnect hydration: authoritative refresh');
+    await fetchFriends({ cooldownMs: 0, force: true });
+    await fetchIncoming({ cooldownMs: 0, force: true });
+    await fetchSent({ cooldownMs: 0, force: true });
   }, [fetchFriends, fetchIncoming, fetchSent]);
 
   // ── Initial load ───────────────────────────────
@@ -219,6 +220,20 @@ export const SocialProvider = ({ children }) => {
         if (data?.type === 'FRIEND_DECLINED') {
           if (eventDedup.isDuplicate('friend.declined.sender', data)) return;
           fetchSent({ cooldownMs: 0, force: true });
+        }
+
+        // Phase N1.1 FIX B: Friend removed — invalidate friendship state immediately
+        // Removed player receives FRIEND_REMOVED, remover receives FRIEND_REMOVED_SELF
+        if (data?.type === 'FRIEND_REMOVED') {
+          if (eventDedup.isDuplicate('friend.removed.target', data)) return;
+          dispatch({ type: 'REMOVE_FRIEND', payload: data.actorId });
+          // Authoritative refetch to ensure DB truth
+          fetchFriends({ cooldownMs: 0, force: true });
+        }
+        if (data?.type === 'FRIEND_REMOVED_SELF') {
+          if (eventDedup.isDuplicate('friend.removed.self', data)) return;
+          dispatch({ type: 'REMOVE_FRIEND', payload: data.removedId });
+          fetchFriends({ cooldownMs: 0, force: true });
         }
       },
       // Phase 3.1.3: socket:reconnected REMOVED — handled by ReconnectCoordinator

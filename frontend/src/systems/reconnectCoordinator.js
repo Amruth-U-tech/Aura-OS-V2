@@ -71,7 +71,9 @@ const _hydrators = {
   player: null,       // PlayerContext.fetchProfile
 
   // Phase 2 — Active Systems (STRICTLY SEQUENTIAL)
+  // Phase N1.1: notifications added, domain hydrators now AUTHORITATIVE
   tasks: null,        // TaskContext (via useTasks)
+  notifications: null,// NotificationContext.softHydrate — Phase N1.1
   social: null,       // SocialContext.softHydrate
   challenges: null,   // ChallengeContext.softHydrate
   hubs: null,         // HubContext.softHydrate
@@ -133,13 +135,17 @@ const executeHydration = async () => {
 
     await delay(PHASE_STAGGER_MS);
 
-    // ── PHASE 2: Active Systems — STRICTLY SEQUENTIAL ──
-    // Each domain awaits completion + delay before the next starts.
-    // This prevents 429 by spreading requests over ~3 seconds.
-    console.info('[ReconnectCoordinator] Phase 2: Sequential domain hydration');
+    // ── PHASE 2: Active Systems — AUTHORITATIVE LIFECYCLE RECONCILIATION ──
+    // Phase N1.1: Each domain hydrator now does force:true authoritative refresh.
+    // This replaces stale lifecycle entities (cancelled challenges, removed friends).
+    console.info('[ReconnectCoordinator] Phase 2: Authoritative domain reconciliation');
 
     console.info('[ReconnectCoordinator]   → tasks');
     await safeCall('tasks');
+    await delay(DOMAIN_STAGGER_MS);
+
+    console.info('[ReconnectCoordinator]   → notifications');
+    await safeCall('notifications');
     await delay(DOMAIN_STAGGER_MS);
 
     console.info('[ReconnectCoordinator]   → social');

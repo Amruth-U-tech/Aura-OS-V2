@@ -83,6 +83,12 @@ class SocketRegistry {
     if (entry) entry.rooms.delete(room);
   }
 
+  // ── Get socket entry (read-only) ─────────────────────
+  // D3.3: Used by disconnect handler to read rooms before unregister
+  get(socketId) {
+    return this._sockets.get(socketId) || null;
+  }
+
   // ── Reconnect Restoration ───────────────────────────
   // Returns previously joined rooms for a reconnecting user
   getDisconnectedSession(userId) {
@@ -137,6 +143,23 @@ class SocketRegistry {
   isUserOnline(userId) {
     const sockets = this._userSockets.get(userId);
     return sockets && sockets.size > 0;
+  }
+
+  // D3.3: Get all unique players connected to a specific room
+  getSocketsInRoom(room) {
+    const seen = new Set();
+    const members = [];
+    for (const [, entry] of this._sockets) {
+      if (entry.rooms.has(room) && !seen.has(entry.auraPlayerId)) {
+        seen.add(entry.auraPlayerId);
+        members.push({
+          auraPlayerId: entry.auraPlayerId,
+          displayName: entry.auraPlayerId, // Will be enriched by frontend
+          online: true,
+        });
+      }
+    }
+    return members;
   }
 
   getOnlineUserCount() {

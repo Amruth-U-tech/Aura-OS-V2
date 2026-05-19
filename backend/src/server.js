@@ -33,6 +33,9 @@ const discoveryRoutes = require('./routes/discoveryRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
 // Phase N1 — Notification Routes
 const notificationRoutes = require('./routes/notificationRoutes');
+// Phase D3.3 — Communication Runtime Routes
+const messageRoutes = require('./routes/messageRoutes');
+const rtcRoutes = require('./routes/rtcRoutes');
 // Phase N2 — Metrics/Observability
 const { getSystemMetrics } = require('./metrics');
 // Phase 3.0 — Realtime Transport Foundation
@@ -92,6 +95,9 @@ app.use('/api/v1/discover', discoveryRoutes);
 app.use('/api/v1/vouchers', voucherRoutes);
 // Phase N1 — Notification Routes
 app.use('/api/v1/notifications', notificationRoutes);
+// Phase D3.3 — Communication Runtime Routes
+app.use('/api/v1/hubs', messageRoutes);
+app.use('/api/v1/hubs', rtcRoutes);
 // Phase N2 — Observability Endpoint
 const { protect } = require('./middleware/authMiddleware');
 app.get('/api/v1/metrics', protect, (req, res) => {

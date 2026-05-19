@@ -58,6 +58,34 @@ const EVENTS = {
   NOTIFICATION_CREATED:      'notification.created',
   NOTIFICATION_READ:         'notification.read',
   NOTIFICATION_ACKNOWLEDGED: 'notification.acknowledged',
+
+  // ── Hub Communication Infrastructure — Phase D3.1 ──
+  HUB_PROVISION_STARTED:     'hub.provision.started',
+  HUB_PROVISIONED:           'hub.provisioned',
+  HUB_PROVISION_FAILED:      'hub.provision.failed',
+
+  HUB_ACCESS_GRANTED:        'hub.access.granted',
+  HUB_ACCESS_REVOKED:        'hub.access.revoked',
+
+  // ── Voice/RTC Domain — Phase D3.1 ──────────────────
+  VOICE_PARTICIPANT_JOINED:  'voice.participant.joined',
+  VOICE_PARTICIPANT_LEFT:    'voice.participant.left',
+  VOICE_STATE_RECONCILED:    'voice.state.reconciled',
+
+  // ── Bot Orchestration Domain — Phase D3.1 ──────────
+  BOT_ORCHESTRATION_STARTED: 'bot.orchestration.started',
+  BOT_ORCHESTRATION_FAILED:  'bot.orchestration.failed',
+
+  // ── Message Domain — Phase D3.3 ────────────────────
+  MESSAGE_CREATED:   'message.created',
+  MESSAGE_EDITED:    'message.edited',
+  MESSAGE_DELETED:   'message.deleted',
+  MESSAGE_REPLAYED:  'message.replayed',
+  MESSAGE_FAILED:    'message.failed',
+
+  // ── Presence Domain — Phase D3.3 ───────────────────
+  PRESENCE_UPDATED:     'presence.updated',
+  PRESENCE_RECONCILED:  'presence.reconciled',
 };
 
 module.exports = { EVENTS };

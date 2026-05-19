@@ -27,7 +27,9 @@ export const ROUTES = {
   // Phase D1 — Discord OAuth
   DISCORD_CALLBACK: '/auth/discord/callback',
   // Phase N1 — Notifications
-  NOTIFICATIONS: '/notifications'
+  NOTIFICATIONS: '/notifications',
+  // Phase D3.3 — Hub Communication  
+  HUB_COMM: '/hubs/:id',
 };
 
 export const API_ENDPOINTS = {
@@ -72,5 +74,9 @@ export const API_ENDPOINTS = {
   HUB_PENDING: '/hubs',
   // Phase N1 — Notifications
   NOTIFICATIONS: '/notifications',
-  NOTIFICATIONS_UNREAD: '/notifications/unread-count'
+  NOTIFICATIONS_UNREAD: '/notifications/unread-count',
+  // Phase D3.3 — Communication Runtime
+  HUB_MESSAGES: '/hubs',
+  HUB_VOICE_TOKEN: '/hubs',
+  HUB_PRESENCE: '/hubs',
 };

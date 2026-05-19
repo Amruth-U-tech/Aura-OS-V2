@@ -56,6 +56,15 @@ const BUFFERABLE_EVENTS = new Set([
   'notification.read',       // Phase N1.1: cross-tab read sync
   'notification.read-all',   // Phase N1.1: cross-tab mark-all-read
   'notification.acknowledged', // Phase N1.1: cross-tab acknowledge sync
+  // Phase D3.3 — Communication Runtime
+  'message.created',
+  'message.edited',
+  'message.deleted',
+  'message.replayed',
+  'presence.updated',
+  'presence.reconciled',
+  'voice.participant.joined',
+  'voice.participant.left',
 ]);
 
 export const SocketProvider = ({ children }) => {
@@ -153,6 +162,15 @@ export const SocketProvider = ({ children }) => {
         makeBridge('notification.read'),       // Phase N1.1
         makeBridge('notification.read-all'),   // Phase N1.1
         makeBridge('notification.acknowledged'), // Phase N1.1
+        // Phase D3.3 — Communication Runtime
+        makeBridge('message.created'),
+        makeBridge('message.edited'),
+        makeBridge('message.deleted'),
+        makeBridge('message.replayed'),
+        makeBridge('presence.updated'),
+        makeBridge('presence.reconciled'),
+        makeBridge('voice.participant.joined'),
+        makeBridge('voice.participant.left'),
       ];
 
       cleanupRef.current = [cleanup1, cleanup2, cleanup3, ...bridges];

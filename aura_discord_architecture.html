@@ -1,0 +1,394 @@
+
+<h2 class="sr-only">Aura-Discord communication architecture: three-tier interactive diagram showing frontend, backend, and Discord infrastructure layers with novel additions</h2>
+
+<style>
+.arch-wrap { padding: 0.5rem 0 1rem; }
+.tier-block { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); margin-bottom: 10px; overflow: hidden; }
+.tier-hdr { padding: 9px 14px; display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 500; letter-spacing: 0.04em; }
+.tier-hdr .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.tier-grid { padding: 10px 12px 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 7px; }
+.comp { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 9px 10px; cursor: pointer; transition: border-color 0.12s, background 0.12s; }
+.comp:hover { border-color: var(--color-border-secondary); background: var(--color-background-secondary); }
+.comp.active { border-color: var(--color-border-primary); background: var(--color-background-secondary); }
+.comp-name { font-size: 12px; font-weight: 500; color: var(--color-text-primary); line-height: 1.3; }
+.comp-sub { font-size: 11px; color: var(--color-text-secondary); margin-top: 3px; line-height: 1.35; }
+.new-badge { display: inline-block; font-size: 9px; font-weight: 500; padding: 1px 5px; border-radius: 3px; margin-left: 4px; vertical-align: middle; background: #EAF3DE; color: #3B6D11; }
+@media (prefers-color-scheme: dark) { .new-badge { background: #27500A; color: #C0DD97; } }
+.detail-panel { display: none; margin: 0 12px 10px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 12px 14px; }
+.detail-panel.visible { display: block; }
+.detail-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 6px; }
+.detail-body { font-size: 12px; color: var(--color-text-secondary); line-height: 1.65; }
+.code { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 6px; padding: 9px 11px; font-family: var(--font-mono); font-size: 11px; margin-top: 9px; white-space: pre; overflow-x: auto; color: var(--color-text-primary); line-height: 1.55; }
+.flow-arrow { text-align: center; font-size: 16px; color: var(--color-text-tertiary); margin: 2px 0; line-height: 1; }
+.section-label { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); letter-spacing: 0.06em; margin-bottom: 8px; }
+.schema-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 7px; }
+.schema-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 9px 10px; }
+.schema-name { font-size: 12px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 6px; }
+.schema-field { font-size: 10px; color: var(--color-text-secondary); padding: 2px 0; border-bottom: 0.5px solid var(--color-border-tertiary); display: flex; justify-content: space-between; gap: 4px; }
+.schema-field:last-child { border-bottom: none; }
+.ftype { color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: 10px; }
+.schema-new { display: inline-block; font-size: 8px; font-weight: 500; padding: 1px 4px; border-radius: 2px; margin-left: 3px; background: #EAF3DE; color: #3B6D11; }
+@media (prefers-color-scheme: dark) { .schema-new { background: #27500A; color: #C0DD97; } }
+</style>
+
+<div class="arch-wrap">
+
+<p class="section-label">ARCHITECTURE LAYERS — click any component to expand</p>
+
+<!-- TIER 1: AURA FRONTEND -->
+<div class="tier-block">
+  <div class="tier-hdr" style="background: #EEEDFE;">
+    <div class="dot" style="background:#7F77DD"></div>
+    <span style="color:#3C3489">Aura frontend</span>
+    <span style="color:#7F77DD; font-size:11px; font-weight:400;">/ browser</span>
+  </div>
+  <div class="tier-grid">
+    <div class="comp" onclick="toggle(this,'hub-router')">
+      <div class="comp-name">Hub router</div>
+      <div class="comp-sub">/aura/hubs/:id owns routing</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'aura-chat')">
+      <div class="comp-name">AuraChat UI</div>
+      <div class="comp-sub">Optimistic send + render</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'aura-voice')">
+      <div class="comp-name">AuraVoice<span class="new-badge">NEW</span></div>
+      <div class="comp-sub">LiveKit WebRTC panel</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'aura-presence')">
+      <div class="comp-name">AuraPresence<span class="new-badge">NEW</span></div>
+      <div class="comp-sub">Voice states + speaking</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'challenge-ui')">
+      <div class="comp-name">ChallengeEngine</div>
+      <div class="comp-sub">Bot-orchestrated events</div>
+    </div>
+  </div>
+  <div id="hub-router" class="detail-panel">
+    <div class="detail-title">Hub router — Aura owns all URLs</div>
+    <div class="detail-body">The URL never leaves <code>/aura/hubs/:id</code>. Routing, history, and navigation are entirely Aura-controlled. Discord never appears in the address bar. Hub metadata, member lists, and challenge state all load from Aura's own API — Discord is invisible to the user.
+    </div>
+  </div>
+  <div id="aura-chat" class="detail-panel">
+    <div class="detail-title">AuraChat UI — optimistic message flow</div>
+    <div class="detail-body">Emit message on send, display immediately with a "pending" visual state, then replace with the confirmed Discord message ID when the relay acknowledges it. Failures show a retry prompt. User perceives zero latency.
+<div class="code">// 1. Optimistic insert
+const tempId = crypto.randomUUID();
+addMessage({ id: tempId, content, status: 'pending' });
+
+// 2. Relay to backend
+socket.emit('hub:message', { hubId, content, tempId });
+
+// 3. Confirm via bot event
+socket.on('hub:message:ack', ({ tempId, discordId }) => {
+  confirmMessage(tempId, discordId);
+});</div>
+    </div>
+  </div>
+  <div id="aura-voice" class="detail-panel">
+    <div class="detail-title">AuraVoice — LiveKit replaces discord://</div>
+    <div class="detail-body">Embed the <code>@livekit/components-react</code> voice panel directly in Aura. LiveKit is an open-source WebRTC SFU — self-hostable, no Discord app required. Your backend provisions a LiveKit room per hub voice channel and issues short-lived JWT tokens. Voice is 100% in the browser tab.
+<div class="code">import { LiveKitRoom, AudioConference } from '@livekit/components-react';
+
+const { token } = await fetch(`/api/hubs/${hubId}/voice-token`).then(r=>r.json());
+
+&lt;LiveKitRoom serverUrl={LIVEKIT_URL} token={token}&gt;
+  &lt;AudioConference /&gt;
+&lt;/LiveKitRoom&gt;</div>
+    </div>
+  </div>
+  <div id="aura-presence" class="detail-panel">
+    <div class="detail-title">AuraPresence — Discord voice states mirrored in-UI</div>
+    <div class="detail-body">Your Discord bot subscribes to <code>VOICE_STATE_UPDATE</code> gateway events. When a member joins/leaves/mutes, the bot emits to your Aura socket, which updates a <code>HubVoiceState</code> map in Redis. Aura renders speaking indicators and the voice member list natively — users see rich presence without ever seeing Discord.
+<div class="code">// Bot gateway handler
+client.on('voiceStateUpdate', (oldState, newState) => {
+  const hubId = mapping.get(newState.channelId);
+  if (!hubId) return;
+  io.to(`hub:${hubId}`).emit('presence:update', {
+    userId: newState.member.user.id,
+    action: newState.channelId ? 'joined' : 'left',
+    muted: newState.mute,
+    deafened: newState.deaf,
+  });
+});</div>
+    </div>
+  </div>
+  <div id="challenge-ui" class="detail-panel">
+    <div class="detail-title">ChallengeEngine — bot as orchestrator</div>
+    <div class="detail-body">When a challenge starts in Aura, emit a socket event to backend, which instructs the Discord bot to post a challenge announcement to the hub's channel. Bot monitors reactions, completions, and interactions, then emits back to Aura to update challenge state. The bot becomes a bidirectional event bridge.
+    </div>
+  </div>
+</div>
+
+<div class="flow-arrow">↓ &nbsp;Socket.io &nbsp; · &nbsp; LiveKit RTC &nbsp; · &nbsp; REST ↓</div>
+
+<!-- TIER 2: AURA BACKEND -->
+<div class="tier-block">
+  <div class="tier-hdr" style="background: #E1F5EE;">
+    <div class="dot" style="background:#1D9E75"></div>
+    <span style="color:#085041">Aura backend</span>
+    <span style="color:#1D9E75; font-size:11px; font-weight:400;">Node.js / Express</span>
+  </div>
+  <div class="tier-grid">
+    <div class="comp" onclick="toggle(this,'socket-gw')">
+      <div class="comp-name">Socket.io gateway</div>
+      <div class="comp-sub">Realtime event bus</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'redis-streams')">
+      <div class="comp-name">Redis Streams<span class="new-badge">NEW</span></div>
+      <div class="comp-sub">Ordered message backbone</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'msg-relay')">
+      <div class="comp-name">Message relay</div>
+      <div class="comp-sub">Webhook out · bot in</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'normalizer')">
+      <div class="comp-name">Normalizer<span class="new-badge">NEW</span></div>
+      <div class="comp-sub">Discord → Aura format</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'livekit-sfu')">
+      <div class="comp-name">LiveKit SFU<span class="new-badge">NEW</span></div>
+      <div class="comp-sub">Self-hosted WebRTC</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'presence-svc')">
+      <div class="comp-name">Presence service<span class="new-badge">NEW</span></div>
+      <div class="comp-sub">Voice state sync layer</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'provisioner')">
+      <div class="comp-name">Hub provisioner<span class="new-badge">NEW</span></div>
+      <div class="comp-sub">Auto Discord setup</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'auth-mw')">
+      <div class="comp-name">JWT middleware</div>
+      <div class="comp-sub">Identity verification</div>
+    </div>
+  </div>
+  <div id="socket-gw" class="detail-panel">
+    <div class="detail-title">Socket.io gateway — rooms by hub ID</div>
+    <div class="detail-body">Every connected client joins a room keyed to their hub: <code>hub:{hubId}</code>. The bot's event consumer and the relay service emit to these rooms. All realtime state (messages, presence, challenge events) flows through this single bus.
+<div class="code">// Client joins hub room on connect
+socket.on('hub:join', async ({ hubId, token }) => {
+  const player = await verifyJWT(token);
+  await verifyHubAccess(player.id, hubId);
+  socket.join(`hub:${hubId}`);
+});</div>
+    </div>
+  </div>
+  <div id="redis-streams" class="detail-panel">
+    <div class="detail-title">Redis Streams — ordered, replayable message backbone</div>
+    <div class="detail-body">Replace the direct webhook→socket pipe with Redis Streams. Two consumer groups read from the same stream: <code>socket-broadcaster</code> (pushes to Socket.io rooms) and <code>discord-relay</code> (posts to Discord webhooks). New joiners can replay recent history from the stream without hitting Discord's API.
+<div class="code">// Producer: inbound message from Aura client
+await redis.xadd(`hub:${hubId}:messages`, '*', {
+  authorId, content, tempId, timestamp: Date.now()
+});
+
+// Consumer group: broadcast to room
+const msgs = await redis.xreadgroup('socket-broadcaster', 'node-1',
+  { key: `hub:${hubId}:messages`, id: '>' });
+msgs.forEach(m => io.to(`hub:${hubId}`).emit('message', m));</div>
+    </div>
+  </div>
+  <div id="msg-relay" class="detail-panel">
+    <div class="detail-title">Message relay — bidirectional bridge</div>
+    <div class="detail-body">Outbound: consumes from Redis Stream, posts to Discord webhook. Inbound: Discord bot emits gateway events (new messages from other clients) → normalized → pushed to Redis Stream → broadcast to Aura room. Signature verification on all webhook payloads.
+<div class="code">// Outbound: Aura → Discord
+async function relayToDiscord(hubId, message) {
+  const { webhookUrl } = await HubDiscordMapping.findOne({ auraHubId: hubId });
+  await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: message.authorName,
+      content: message.content,
+    }),
+  });
+}</div>
+    </div>
+  </div>
+  <div id="normalizer" class="detail-panel">
+    <div class="detail-title">Normalization layer — Discord format → Aura-native</div>
+    <div class="detail-body">Bot receives raw Discord message objects. Normalize them before they touch Aura: resolve mentions to Aura player IDs, convert Discord CDN URLs to Aura media proxies, transform embeds to Aura card components, map Discord sticker IDs to Aura media assets.
+<div class="code">function normalizeDiscordMessage(msg, mapping) {
+  return {
+    id: msg.id,
+    content: resolveMentions(msg.content, mapping),
+    author: resolveAuthor(msg.author.id, mapping),
+    attachments: msg.attachments.map(proxyCDNUrl),
+    sticker: msg.sticker_items?.[0]
+      ? resolveStickerToAura(msg.sticker_items[0].id)
+      : null,
+    timestamp: msg.timestamp,
+  };
+}</div>
+    </div>
+  </div>
+  <div id="livekit-sfu" class="detail-panel">
+    <div class="detail-title">LiveKit SFU — self-hosted WebRTC media server</div>
+    <div class="detail-body">Deploy LiveKit on your own infra (Docker image, ~200MB). Your backend issues short-lived room tokens keyed to <code>hub:{hubId}:voice</code>. LiveKit handles STUN/TURN, NAT traversal, encrypted audio streams, adaptive bitrate — everything Discord's client runtime does, but controlled by you.
+<div class="code">// Issue LiveKit token for hub voice
+import { AccessToken } from 'livekit-server-sdk';
+
+app.get('/api/hubs/:id/voice-token', auth, async (req, res) => {
+  const at = new AccessToken(LK_API_KEY, LK_API_SECRET, {
+    identity: req.player.id,
+    ttl: '1h',
+  });
+  at.addGrant({ roomJoin: true, room: `hub:${req.params.id}` });
+  res.json({ token: await at.toJwt() });
+});</div>
+    </div>
+  </div>
+  <div id="presence-svc" class="detail-panel">
+    <div class="detail-title">Presence service — Discord voice states in Aura UI</div>
+    <div class="detail-body">Bot gateway VOICE_STATE_UPDATE events flow into this service, which writes to a Redis hash <code>hub:{hubId}:voice-members</code> and emits to Socket.io rooms. Aura renders the live member list with mute/deafen states without any Discord UI. Completely native Aura presence.
+<div class="code">// Redis hash: who's in voice right now
+await redis.hset(`hub:${hubId}:voice-members`, playerId, JSON.stringify({
+  displayName, avatar, muted, deafened, speaking: false,
+}));
+
+// Speaking indicator via Discord's SPEAKING gateway event
+client.ws.on('SPEAKING', ({ user_id, speaking }) => {
+  io.to(`hub:${hubId}`).emit('presence:speaking', { userId: user_id, speaking });
+});</div>
+    </div>
+  </div>
+  <div id="provisioner" class="detail-panel">
+    <div class="detail-title">Hub provisioner — automated Discord resource setup</div>
+    <div class="detail-body">When a new Aura hub is created, this service calls the Discord bot to: create a guild category, create a text channel, create a voice channel, register a webhook on the text channel. On success, writes the <code>HubDiscordMapping</code> record. Status transitions: <code>PROVISIONING → ACTIVE</code>.
+<div class="code">async function provisionHubInDiscord(hub) {
+  const category = await guild.channels.create({ name: hub.name, type: ChannelType.GuildCategory });
+  const text = await guild.channels.create({ name: 'general', type: ChannelType.GuildText, parent: category.id });
+  const voice = await guild.channels.create({ name: 'voice', type: ChannelType.GuildVoice, parent: category.id });
+  const webhook = await text.createWebhook({ name: 'Aura Relay' });
+  await HubDiscordMapping.create({
+    auraHubId: hub._id,
+    discordGuildId: guild.id,
+    discordCategoryId: category.id,
+    discordChannelId: text.id,
+    discordVoiceChannelId: voice.id,
+    webhookUrl: webhook.url,
+    syncStatus: 'ACTIVE',
+  });
+}</div>
+    </div>
+  </div>
+  <div id="auth-mw" class="detail-panel">
+    <div class="detail-title">JWT middleware — identity across all surfaces</div>
+    <div class="detail-body">Aura JWT is verified on every socket event and HTTP request. The bot maintains a <code>discordId ↔ auraPlayerId</code> mapping in <code>HubAccessState</code>. When a Discord event arrives, the normalizer resolves the Discord user ID to an Aura player — so messages always carry Aura identity, not Discord identity.
+    </div>
+  </div>
+</div>
+
+<div class="flow-arrow">↓ &nbsp;Bot gateway WS &nbsp; · &nbsp; Webhooks &nbsp; · &nbsp; REST API ↓</div>
+
+<!-- TIER 3: DISCORD INFRASTRUCTURE -->
+<div class="tier-block">
+  <div class="tier-hdr" style="background: #FAECE7;">
+    <div class="dot" style="background:#D85A30"></div>
+    <span style="color:#4A1B0C">Discord infrastructure</span>
+    <span style="color:#D85A30; font-size:11px; font-weight:400;">headless transport layer</span>
+  </div>
+  <div class="tier-grid">
+    <div class="comp" onclick="toggle(this,'bot-gw')">
+      <div class="comp-name">Bot gateway</div>
+      <div class="comp-sub">Persistent WS listener</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'webhooks')">
+      <div class="comp-name">Webhooks</div>
+      <div class="comp-sub">Write-path to channels</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'guild-api')">
+      <div class="comp-name">Guild / channel API</div>
+      <div class="comp-sub">REST management</div>
+    </div>
+    <div class="comp" onclick="toggle(this,'discord-voice')">
+      <div class="comp-name">Discord voice</div>
+      <div class="comp-sub">Fallback only</div>
+    </div>
+  </div>
+  <div id="bot-gw" class="detail-panel">
+    <div class="detail-title">Bot gateway — all inbound events flow here</div>
+    <div class="detail-body">Your Discord.js bot maintains a persistent WebSocket to Discord's gateway. It listens for: MESSAGE_CREATE (relay to Aura), VOICE_STATE_UPDATE (presence mirror), GUILD_MEMBER_ADD/REMOVE (access sync), and custom interaction events (challenge completions). This is the only persistent connection to Discord.
+    </div>
+  </div>
+  <div id="webhooks" class="detail-panel">
+    <div class="detail-title">Webhooks — Aura messages written to Discord</div>
+    <div class="detail-body">Per-channel webhooks are created by the Hub Provisioner during hub setup. The message relay service posts to these URLs when an Aura user sends a message. Discord becomes a durable ledger of all hub communication, accessible from native Discord clients if needed.
+    </div>
+  </div>
+  <div id="guild-api" class="detail-panel">
+    <div class="detail-title">Guild API — provisioning and access control</div>
+    <div class="detail-body">Used only by the Hub Provisioner and access sync services. Creates categories/channels on hub creation, manages permission overwrites for private hubs, handles member role assignment. Not involved in the message hot path — keeps the relay latency clean.
+    </div>
+  </div>
+  <div id="discord-voice" class="detail-panel">
+    <div class="detail-title">Discord voice — graceful fallback only</div>
+    <div class="detail-body">With LiveKit SFU handling browser voice, Discord's voice channels are demoted to fallback. If LiveKit is unavailable, Aura shows a "join via Discord" button that deep-links with the discord:// protocol handler as a last resort. Most users will never see this path.
+    </div>
+  </div>
+</div>
+
+<!-- DATABASE LAYER -->
+<div style="margin-top: 16px;">
+  <p class="section-label">DATABASE LAYER — MongoDB collections</p>
+  <div class="schema-grid">
+    <div class="schema-card">
+      <div class="schema-name">HubDiscordMapping</div>
+      <div class="schema-field"><span>auraHubId</span><span class="ftype">ObjectId</span></div>
+      <div class="schema-field"><span>discordGuildId</span><span class="ftype">String</span></div>
+      <div class="schema-field"><span>discordChannelId</span><span class="ftype">String</span></div>
+      <div class="schema-field"><span>discordVoiceChannelId<span class="schema-new">NEW</span></span><span class="ftype">String</span></div>
+      <div class="schema-field"><span>webhookUrl</span><span class="ftype">String</span></div>
+      <div class="schema-field"><span>syncStatus</span><span class="ftype">Enum</span></div>
+    </div>
+    <div class="schema-card">
+      <div class="schema-name">HubAccessState</div>
+      <div class="schema-field"><span>auraPlayerId</span><span class="ftype">ObjectId</span></div>
+      <div class="schema-field"><span>auraHubId</span><span class="ftype">ObjectId</span></div>
+      <div class="schema-field"><span>discordUserId</span><span class="ftype">String</span></div>
+      <div class="schema-field"><span>hasChannelAccess</span><span class="ftype">Boolean</span></div>
+      <div class="schema-field"><span>permissionRoles</span><span class="ftype">String[]</span></div>
+      <div class="schema-field"><span>lastSyncedAt</span><span class="ftype">Date</span></div>
+    </div>
+    <div class="schema-card">
+      <div class="schema-name">HubVoiceState <span class="schema-new">NEW</span></div>
+      <div class="schema-field"><span>auraHubId</span><span class="ftype">ObjectId</span></div>
+      <div class="schema-field"><span>livekitRoomId</span><span class="ftype">String</span></div>
+      <div class="schema-field"><span>activeParticipants</span><span class="ftype">Mixed[]</span></div>
+      <div class="schema-field"><span>discordVoiceCount</span><span class="ftype">Number</span></div>
+      <div class="schema-field"><span>lastUpdatedAt</span><span class="ftype">Date</span></div>
+    </div>
+    <div class="schema-card">
+      <div class="schema-name">MessageStream <span class="schema-new">NEW</span></div>
+      <div class="schema-field"><span>Redis Stream key</span><span class="ftype">String</span></div>
+      <div class="schema-field"><span>hub:{id}:messages</span><span class="ftype">XADD</span></div>
+      <div class="schema-field"><span>TTL: 7 days</span><span class="ftype">Config</span></div>
+      <div class="schema-field"><span>Groups: 2</span><span class="ftype">XGROUP</span></div>
+    </div>
+    <div class="schema-card">
+      <div class="schema-name">BotOrchestration <span class="schema-new">NEW</span></div>
+      <div class="schema-field"><span>hubId</span><span class="ftype">ObjectId</span></div>
+      <div class="schema-field"><span>eventType</span><span class="ftype">Enum</span></div>
+      <div class="schema-field"><span>challengeId</span><span class="ftype">ObjectId</span></div>
+      <div class="schema-field"><span>discordMessageId</span><span class="ftype">String</span></div>
+      <div class="schema-field"><span>resolvedAt</span><span class="ftype">Date</span></div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+let activePanels = {};
+function toggle(card, panelId) {
+  const panel = document.getElementById(panelId);
+  const tierBlock = card.closest('.tier-block');
+  const isOpen = panel.classList.contains('visible');
+  tierBlock.querySelectorAll('.detail-panel').forEach(p => p.classList.remove('visible'));
+  tierBlock.querySelectorAll('.comp').forEach(c => c.classList.remove('active'));
+  if (!isOpen) {
+    panel.classList.add('visible');
+    card.classList.add('active');
+  }
+}
+</script>

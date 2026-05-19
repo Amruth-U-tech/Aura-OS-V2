@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import hubApi from '@services/hubApi';
 import discoveryApi from '@services/discoveryApi';
 import { useAuth } from '@context/AuthContext';
@@ -29,6 +30,7 @@ const HubsPage = () => {
 
   // Phase 3.1.1: Consume from HubContext (guaranteed array)
   const { hubs, loading: hubsLoading, refreshHubs } = useHubs();
+  const navigate = useNavigate();
 
   const [form, setForm] = useState({ name: '', description: '', visibility: 'PUBLIC', maxMembers: 50 });
 
@@ -134,7 +136,8 @@ const HubsPage = () => {
           {(hubsLoading || loading) ? <p className="empty-text">Loading...</p> :
             (Array.isArray(hubs) ? hubs : []).length === 0 ? <p className="empty-text">No hubs yet. Discover or create one!</p> :
               (Array.isArray(hubs) ? hubs : []).map((h, i) => (
-                <div key={h._id || h.id || i} className="hub-card">
+                <div key={h._id || h.id || i} className="hub-card"
+                  onClick={() => navigate(`/hubs/${h.auraHubId || h.id || h._id}`)}>
                   <div className="hub-icon">🌐</div>
                   <div className="hub-info">
                     <span className="hub-name">{h.name}</span>
@@ -146,8 +149,8 @@ const HubsPage = () => {
                     {renderVisibilityBadge(h.visibility)}
                   </div>
                   <div className="hub-actions" onClick={(e) => e.stopPropagation()}>
-                    <button className="btn-leave" onClick={() => handleLeave(h.id)}
-                      disabled={actionLoading === h.id}>Leave</button>
+                    <button className="btn-leave" onClick={() => handleLeave(h.id || h._id)}
+                      disabled={actionLoading === (h.id || h._id)}>Leave</button>
                   </div>
                 </div>
               ))

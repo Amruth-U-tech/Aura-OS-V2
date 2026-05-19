@@ -60,7 +60,7 @@ const joinHubRoom = async (socket, auraHubId) => {
   const room = buildHubRoom(auraHubId);
   socket.join(room);
   socketRegistry.joinRoom(socket.id, room);
-  console.info(`${tag} ${socket.data.auraPlayerId} joined ${room}`);
+  console.info(`${tag} ${socket.data.auraPlayerId} connected to room ${room}`);
   return { success: true, room };
 };
 

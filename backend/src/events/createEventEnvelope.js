@@ -98,6 +98,10 @@ const _inferEntityType = (eventName) => {
   if (eventName.startsWith('hub.')) return 'hub';
   if (eventName.startsWith('voucher.') || eventName.startsWith('reward.')) return 'reward';
   if (eventName.startsWith('notification.')) return 'notification';
+  if (eventName.startsWith('voice.')) return 'voice';       // Phase D3.1
+  if (eventName.startsWith('bot.')) return 'orchestration';  // Phase D3.1
+  if (eventName.startsWith('message.')) return 'message';    // Phase D3.3
+  if (eventName.startsWith('presence.')) return 'presence';  // Phase D3.3
   return null;
 };
 

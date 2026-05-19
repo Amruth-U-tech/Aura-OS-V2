@@ -3,6 +3,8 @@ const socketAuthMiddleware = require('./socketAuthMiddleware');
 const socketRegistry = require('./socketRegistry');
 const roomManager = require('./roomManager');
 const socketEmitter = require('./socketEmitter');
+const auraEvents = require('../events/eventBus');
+const { EVENTS } = require('../events/eventConstants');
 
 // ======================================================
 // SOCKET SERVER — Phase 3.0.1 (Hardened)
@@ -111,6 +113,15 @@ const initializeSocketServer = (httpServer) => {
           return;
         }
         const result = await roomManager.joinHubRoom(socket, auraHubId);
+        // D3.3: Emit presence.updated on successful room join
+        if (result.success) {
+          auraEvents.emitEvent(EVENTS.PRESENCE_UPDATED, {
+            auraHubId,
+            auraPlayerId: socket.data.auraPlayerId,
+            displayName: socket.data.displayName || 'Player',
+            online: true,
+          }, { source: 'socketServer' });
+        }
         if (typeof ack === 'function') ack(result);
       } catch (err) {
         console.error(`${tag} Error joining hub room:`, err.message);
@@ -177,7 +188,22 @@ const initializeSocketServer = (httpServer) => {
 
     // ── Disconnect Handler ──────────────────────────
     socket.on('disconnect', (reason) => {
-      const entry = socketRegistry.unregister(socket.id);
+      // D3.3: Emit presence.updated (offline) for each hub room this socket was in
+      const entry = socketRegistry.get(socket.id);
+      if (entry?.rooms) {
+        for (const room of entry.rooms) {
+          if (room.startsWith(roomManager.ROOM_PREFIX.HUB)) {
+            const hubAuraId = room.replace(roomManager.ROOM_PREFIX.HUB, '');
+            auraEvents.emitEvent(EVENTS.PRESENCE_UPDATED, {
+              auraHubId: hubAuraId,
+              auraPlayerId: socket.data.auraPlayerId,
+              displayName: socket.data.displayName || 'Player',
+              online: false,
+            }, { source: 'socketServer' });
+          }
+        }
+      }
+      const unregistered = socketRegistry.unregister(socket.id);
       const remaining = socketRegistry.getSocketsByUserId(userId).size;
       console.info(`${tag} Disconnected (reason: ${reason}, remaining tabs: ${remaining})`);
     });

@@ -3,6 +3,7 @@ const { EVENTS } = require('../eventConstants');
 const socketEmitter = require('../../realtime/socketEmitter');
 const PlayerProfile = require('../../models/PlayerProfile');
 const Challenge = require('../../models/Challenge');
+const Hub = require('../../models/Hub');
 
 // ======================================================
 // SOCKET LISTENER — Phase 3.1.6
@@ -422,6 +423,105 @@ const register = () => {
     }
   });
 
+  // ── D3.3 Message Events → Hub Room ────────────────
+  auraEvents.registerListener(EVENTS.MESSAGE_CREATED, 'socket:message.created', async (data) => {
+    const hubId = data.hubId;
+    if (!hubId) return;
+    // Resolve auraHubId from MongoDB hubId for room targeting
+    const hub = await _resolveHubAuraId(hubId);
+    if (!hub) {
+      console.warn('[SocketListener] message.created: could not resolve hub for', hubId);
+      return;
+    }
+    socketEmitter.emitToHub(hub, 'message.created', {
+      _id: data._id,
+      hubId: data.hubId,
+      senderId: data.senderId,
+      senderName: data.senderName,
+      senderAvatar: data.senderAvatar,
+      content: data.content,
+      contentType: data.contentType,
+      source: data.source,
+      tempId: data.tempId,
+      sequence: data.sequence || data._meta?.sequence,
+      createdAt: data.createdAt,
+      timestamp: Date.now(),
+    });
+  });
+
+  auraEvents.registerListener(EVENTS.MESSAGE_EDITED, 'socket:message.edited', async (data) => {
+    const hub = await _resolveHubAuraId(data.hubId);
+    if (!hub) return;
+    socketEmitter.emitToHub(hub, 'message.edited', {
+      _id: data._id,
+      hubId: data.hubId,
+      content: data.content,
+      edited: data.edited,
+      editedAt: data.editedAt,
+      sequence: data.sequence,
+      timestamp: Date.now(),
+    });
+  });
+
+  auraEvents.registerListener(EVENTS.MESSAGE_DELETED, 'socket:message.deleted', async (data) => {
+    const hub = await _resolveHubAuraId(data.hubId);
+    if (!hub) return;
+    socketEmitter.emitToHub(hub, 'message.deleted', {
+      _id: data._id,
+      hubId: data.hubId,
+      deleted: true,
+      sequence: data.sequence,
+      timestamp: Date.now(),
+    });
+  });
+
+  // ── D3.3 Presence Events → Hub Room ───────────────
+  auraEvents.registerListener(EVENTS.PRESENCE_UPDATED, 'socket:presence.updated', async (data) => {
+    const hub = data.auraHubId || await _resolveHubAuraId(data.hubId);
+    if (!hub) return;
+    socketEmitter.emitToHub(hub, 'presence.updated', {
+      hubId: data.hubId,
+      auraPlayerId: data.auraPlayerId,
+      displayName: data.displayName,
+      online: data.online !== false, // default true
+      inVoice: data.inVoice || false,
+      speaking: data.speaking || false,
+      timestamp: Date.now(),
+    });
+  });
+
+  auraEvents.registerListener(EVENTS.PRESENCE_RECONCILED, 'socket:presence.reconciled', async (data) => {
+    const hub = data.auraHubId || await _resolveHubAuraId(data.hubId);
+    if (!hub) return;
+    socketEmitter.emitToHub(hub, 'presence.reconciled', {
+      hubId: data.hubId,
+      members: data.members || [],
+      timestamp: Date.now(),
+    });
+  });
+
+  // ── D3.3 Voice Events → Hub Room ──────────────────
+  auraEvents.registerListener(EVENTS.VOICE_PARTICIPANT_JOINED, 'socket:voice.participant.joined', async (data) => {
+    const hub = data.auraHubId || await _resolveHubAuraId(data.hubId);
+    if (!hub) return;
+    socketEmitter.emitToHub(hub, 'voice.participant.joined', {
+      auraPlayerId: data.auraPlayerId,
+      displayName: data.displayName,
+      hubId: data.hubId,
+      timestamp: Date.now(),
+    });
+  });
+
+  auraEvents.registerListener(EVENTS.VOICE_PARTICIPANT_LEFT, 'socket:voice.participant.left', async (data) => {
+    const hub = data.auraHubId || await _resolveHubAuraId(data.hubId);
+    if (!hub) return;
+    socketEmitter.emitToHub(hub, 'voice.participant.left', {
+      auraPlayerId: data.auraPlayerId,
+      hubId: data.hubId,
+      timestamp: Date.now(),
+    });
+  });
+
   // ── Voucher Events ────────────────────────────────
   auraEvents.registerListener(EVENTS.VOUCHER_UNLOCKED, 'socket:voucher.unlocked', async (data) => {
     const auraId = await _resolveAuraPlayerId(data.userId);
@@ -483,6 +583,31 @@ const _resolveAuraPlayerId = async (userId) => {
     });
     return profile.auraPlayerId;
   }
+  return null;
+};
+
+// ── Helper: resolve hubId (MongoDB ObjectId OR auraHubId) → auraHubId ──
+const _hubAuraIdCache = new Map();
+
+const _resolveHubAuraId = async (hubId) => {
+  if (!hubId) return null;
+  const key = hubId.toString();
+
+  // If it's already an AURA-HUB-XXX format, return directly
+  if (key.startsWith('AURA-HUB-')) return key;
+
+  // Check cache
+  const cached = _hubAuraIdCache.get(key);
+  if (cached && (Date.now() - cached.ts) < _CACHE_TTL_MS) return cached.auraHubId;
+
+  // Resolve from DB
+  try {
+    const hub = await Hub.findById(key).select('auraHubId').lean();
+    if (hub?.auraHubId) {
+      _hubAuraIdCache.set(key, { auraHubId: hub.auraHubId, ts: Date.now() });
+      return hub.auraHubId;
+    }
+  } catch { /* invalid ObjectId — not a crash */ }
   return null;
 };
 

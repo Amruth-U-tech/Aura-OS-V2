@@ -36,7 +36,9 @@ const DiscordIntegration = require('../models/DiscordIntegration');
 //   - Discord tokens stored with select:false (never in API responses)
 // ======================================================
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+// Primary frontend origin (first entry in comma-separated FRONTEND_URL)
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')[0].trim();
 
 // ── GET /auth/discord ────────────────────────────────
 // Returns the Discord OAuth authorization URL for frontend to redirect to

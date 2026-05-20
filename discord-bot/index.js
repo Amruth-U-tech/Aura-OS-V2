@@ -21,6 +21,12 @@
 //   - Redis failure degrades gracefully
 // ======================================================
 
+// ── Force Google DNS for MongoDB Atlas SRV lookup ─────
+// Fixes: querySrv ECONNREFUSED _mongodb._tcp.cluster0.xxx
+// Root cause: system DNS resolver cannot resolve SRV records
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+
 require('dotenv').config({ path: require('path').resolve(__dirname, '../backend/.env') });
 
 const { Client, GatewayIntentBits, Events } = require('discord.js');
@@ -96,16 +102,32 @@ async function boot() {
   }
 
   // Step 2: MongoDB (shared DB with backend)
-  try {
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(process.env.MONGO_URI);
+  // Pre-check: verify DNS can resolve the Atlas hostname before connecting
+  const MONGO_CONNECT_RETRIES = 3;
+  for (let attempt = 1; attempt <= MONGO_CONNECT_RETRIES; attempt++) {
+    try {
+      if (mongoose.connection.readyState === 0) {
+        console.log(`[Bot] 🔗 MongoDB connect attempt ${attempt}/${MONGO_CONNECT_RETRIES}...`);
+        await mongoose.connect(process.env.MONGO_URI, {
+          serverSelectionTimeoutMS: 15000,
+          connectTimeoutMS: 15000,
+          socketTimeoutMS: 30000,
+          family: 4, // Force IPv4 — avoids IPv6 DNS issues
+        });
+      }
+      health.mongoReady = true;
+      console.log('[Bot] ✅ MongoDB connected');
+      break;
+    } catch (err) {
+      logError('mongo', err);
+      if (attempt < MONGO_CONNECT_RETRIES) {
+        console.warn(`[Bot] ⚠️ Retrying MongoDB in 3s... (attempt ${attempt}/${MONGO_CONNECT_RETRIES})`);
+        await new Promise(r => setTimeout(r, 3000));
+      } else {
+        console.error('[Bot] ❌ MongoDB connection failed after all retries — bot cannot operate');
+        process.exit(1);
+      }
     }
-    health.mongoReady = true;
-    console.log('[Bot] ✅ MongoDB connected');
-  } catch (err) {
-    logError('mongo', err);
-    console.error('[Bot] ❌ MongoDB connection failed — bot cannot operate');
-    process.exit(1);
   }
 
   // Step 3: Subscribe to bot:commands

@@ -1,0 +1,8 @@
+/* SPA fallback — Render static site rewrite rule
+   Equivalent to: Source=/* Destination=/index.html Action=Rewrite
+   This file is not supported by Render directly.
+   Configure via Render Dashboard > Static Site > Redirects/Rewrites:
+     Source:      /*
+     Destination: /index.html
+     Action:      Rewrite
+*/

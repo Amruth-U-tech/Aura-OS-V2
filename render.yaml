@@ -1,0 +1,64 @@
+# ======================================================
+# RENDER DEPLOYMENT SPEC — Aura OS V2
+# Phase Ω.R — Deployment Reconciliation
+#
+# Configures:
+#   - backend:  Web Service (Node.js)
+#   - frontend: Static Site (Vite build)
+#
+# DO NOT set secret values here — set them in Render Dashboard
+# ======================================================
+
+services:
+  # ── Backend Web Service ──────────────────────────────
+  - type: web
+    name: aura-os-v2
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node src/server.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      # Set these in Render Dashboard (secret values):
+      # MONGO_URI
+      # JWT_SECRET
+      # JWT_EXPIRES_IN
+      # FRONTEND_URL     → http://localhost:5173,https://aura-os-v2-1.onrender.com
+      # DISCORD_CLIENT_ID
+      # DISCORD_CLIENT_SECRET
+      # DISCORD_BOT_TOKEN
+      # DISCORD_MASTER_TOKEN
+      # DISCORD_REDIRECT_URI → https://aura-os-v2-1.onrender.com/auth/discord/callback
+      # GEMMA_API_KEY
+      # GEMMA_API_URL
+      # GEMMA_MODEL
+      # CLOUDINARY_CLOUD_NAME
+      # CLOUDINARY_API_KEY
+      # CLOUDINARY_API_SECRET
+      # LK_API_KEY
+      # LK_API_SECRET
+      # LK_SERVER_URL
+      # REDIS_URL        → set to your Redis provider URL (Upstash, Redis Cloud, etc.)
+
+  # ── Frontend Static Site ─────────────────────────────
+  - type: web
+    name: aura-os-v2-1
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    plan: free
+    routes:
+      # SPA FALLBACK — serves index.html for all routes
+      # This fixes: 404 on refresh, direct URL, /hubs/:id, /auth/discord/callback
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Set these in Render Dashboard:
+      # VITE_API_URL    → https://aura-os-v2.onrender.com
+      # VITE_SOCKET_URL → https://aura-os-v2.onrender.com

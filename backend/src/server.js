@@ -1,5 +1,8 @@
-// Force Google DNS — bypasses ISP DNS that blocks MongoDB Atlas SRV records
-require('dns').setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+// Force Google DNS in dev — bypasses ISP DNS that blocks MongoDB Atlas SRV records
+// Skip in production: Render has working DNS and Atlas network peering works correctly
+if (process.env.NODE_ENV !== 'production') {
+  require('dns').setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+}
 
 require('./config/env'); // MUST BE FIRST: validates env variables
 

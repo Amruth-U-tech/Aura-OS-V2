@@ -28,7 +28,8 @@ let _heartbeatSweeper = null;
 const initializeSocketServer = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+      origin: (process.env.FRONTEND_URL || 'http://localhost:5173')
+        .split(',').map(o => o.trim()).filter(Boolean),
       methods: ['GET', 'POST'],
       credentials: true
     },

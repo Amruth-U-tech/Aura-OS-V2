@@ -64,8 +64,14 @@ connectDB();
 
 // Middleware Pipeline
 app.use(helmet());
+// CORS: supports comma-separated FRONTEND_URL for multi-origin (local + Render)
+const _allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: _allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true  // Phase D1.DEBUG: Allow cookies for OAuth state validation
